@@ -18,6 +18,11 @@ export const settingsSchema = z.object({
     .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-9, {
       message: "Ulog može imati najviše dve decimale.",
     }),
+  maxRequestsPerScan: z.coerce
+    .number({ invalid_type_error: "Limit zahteva mora biti broj." })
+    .int("Limit zahteva mora biti ceo broj.")
+    .min(1, "Limit zahteva mora biti najmanje 1.")
+    .max(1000, "Limit zahteva može biti najviše 1000."),
 });
 
 export type SettingsInput = z.infer<typeof settingsSchema>;

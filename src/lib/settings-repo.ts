@@ -8,6 +8,7 @@ export async function getSettings() {
     stakePerSelection: s.stakePerSelection.toNumber(),
     currency: s.currency,
     timezone: s.timezone,
+    maxRequestsPerScan: s.maxRequestsPerScan,
     updatedAt: s.updatedAt,
   };
 }

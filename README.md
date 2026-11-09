@@ -9,12 +9,23 @@ rezultata i statistiku prolaznosti sa simulacijom profita/gubitka (1.000 RSD po 
 
 | Faza | Sadržaj | Status |
 |---|---|---|
-| 1 | Osnova, baza, prijava, navigacija, dashboard, dark UI | ✅ gotovo – čeka test |
-| 2 | Robot – izvor kvota, ručni scan, ≤ 1.30, samo fudbal | ⏳ |
+| 1 | Osnova, baza, prijava, navigacija, dashboard, dark UI | ✅ odobreno |
+| 2 | Robot – izvor kvota, ručni scan, ≤ 1.30, samo fudbal | ✅ gotovo – čeka test |
 | 3 | Filter – drag & drop, trajno čuvanje, filter setovi | ⏳ |
 | 4 | Result Tracker – rezultati, obračun, statusi | ⏳ |
 | 5 | Statistika, profit po filteru, istorija | ⏳ |
 | 6 | Završno testiranje i produkcija | ⏳ |
+
+## Izvor kvota (faza 2)
+Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze preko **OddsPapi** agregatora
+(bukmejker `soccerbet.rs`, fudbal `sportId=10`). Ključ se postavlja kao `ODDSPAPI_API_KEY` (samo na serveru).
+
+- Robot se pokreće isključivo ručno (START ROBOT), može da se zaustavi (STOP).
+- Troši malo zahteva: 1 × `/markets` (keš 24h) + 1 × `/fixtures` po periodu do 9 dana + 1 × `/odds-by-tournaments` na svaka 3 turnira.
+- Limit zahteva po skeniranju je u Podešavanjima (podrazumevano 60). Stanje mesečne kvote se čita preko `/account`, koji ne troši kvotu.
+- Pravilo kvote je centralno, u `isValidOdds` (`src/lib/odds.ts`): mora biti > 1.00 i ≤ 1.30. Virtuelni fudbal, e-sport i simulacije izbacuje `src/lib/robot/football.ts`.
+- Svako skeniranje čuva nove zapise kvota sa vremenom i izvorom, a stare nikada ne prepisuje.
+- Bez ključa radi samo **DEMO** izvor (izmišljene utakmice, jasno označene).
 
 ## Tehnologije
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL + Prisma 6 · Vitest · Playwright

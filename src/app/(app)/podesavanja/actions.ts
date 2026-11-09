@@ -15,22 +15,23 @@ export async function saveSettingsAction(_prev: SettingsState, formData: FormDat
   const parsed = settingsSchema.safeParse({
     maxOdds: normalizeDecimal(formData.get("maxOdds")),
     stakePerSelection: normalizeDecimal(formData.get("stakePerSelection")),
+    maxRequestsPerScan: normalizeDecimal(formData.get("maxRequestsPerScan")),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const before = await getSettings();
   const next = parsed.data;
-  if (before.maxOdds === next.maxOdds && before.stakePerSelection === next.stakePerSelection) return { ok: true };
+  if (before.maxOdds === next.maxOdds && before.stakePerSelection === next.stakePerSelection && before.maxRequestsPerScan === next.maxRequestsPerScan) return { ok: true };
 
   await prisma.$transaction([
-    prisma.settings.update({ where: { id: 1 }, data: { maxOdds: next.maxOdds, stakePerSelection: next.stakePerSelection } }),
+    prisma.settings.update({ where: { id: 1 }, data: next }),
     prisma.auditLog.create({
       data: {
         userId: user.id,
         entityType: "Settings",
         entityId: "1",
         action: "UPDATE",
-        oldValue: { maxOdds: before.maxOdds, stakePerSelection: before.stakePerSelection },
+        oldValue: { maxOdds: before.maxOdds, stakePerSelection: before.stakePerSelection, maxRequestsPerScan: before.maxRequestsPerScan },
         newValue: next,
       },
     }),

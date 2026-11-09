@@ -5,7 +5,7 @@ import { saveSettingsAction, type SettingsState } from "./actions";
 
 const input = "w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/30";
 
-export function SettingsForm({ maxOdds, stake }: { maxOdds: number; stake: number }) {
+export function SettingsForm({ maxOdds, stake, maxRequests }: { maxOdds: number; stake: number; maxRequests: number }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettingsAction, {});
   return (
     <form action={action} className="space-y-5">
@@ -19,6 +19,11 @@ export function SettingsForm({ maxOdds, stake }: { maxOdds: number; stake: numbe
           <label htmlFor="stakePerSelection" className="mb-1.5 block text-sm text-muted">Ulog po tipu (RSD)</label>
           <input id="stakePerSelection" name="stakePerSelection" inputMode="decimal" defaultValue={stake.toFixed(2)} className={input} />
           <p className="mt-1.5 text-xs text-muted">Važi samo za nove obračune, stari se ne menjaju.</p>
+        </div>
+        <div>
+          <label htmlFor="maxRequestsPerScan" className="mb-1.5 block text-sm text-muted">Limit API zahteva po skeniranju</label>
+          <input id="maxRequestsPerScan" name="maxRequestsPerScan" inputMode="numeric" defaultValue={maxRequests} className={input} />
+          <p className="mt-1.5 text-xs text-muted">Robot staje kad potroši ovoliko OddsPapi zahteva, da ne potroši mesečnu kvotu.</p>
         </div>
       </div>
       {state.error && <p role="alert" className="rounded-lg bg-lost/10 px-3 py-2 text-sm text-lost">{state.error}</p>}

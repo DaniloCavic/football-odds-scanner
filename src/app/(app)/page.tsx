@@ -2,10 +2,11 @@ import Link from "next/link";
 import { PageHeader, StatCard, Card, EmptyState } from "@/components/ui";
 import { IconRobot } from "@/components/icons";
 import { getSettings } from "@/lib/settings-repo";
-import { formatOdds, formatRsd } from "@/lib/format";
+import { formatDateTime, formatOdds, formatRsd } from "@/lib/format";
+import { recentScans } from "@/lib/robot/scans";
 
 export default async function DashboardPage() {
-  const settings = await getSettings();
+  const [settings, [last]] = await Promise.all([getSettings(), recentScans(1)]);
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Pregled sistema, poslednjeg skeniranja i tipova.">
@@ -24,7 +25,16 @@ export default async function DashboardPage() {
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <h2 className="mb-4 font-semibold">Poslednje skeniranje</h2>
-          <EmptyState title="Još nema skeniranja" text="Robot se pokreće isključivo ručno, dugmetom START ROBOT. Skeniranje stiže u fazi 2." />
+          {last ? (
+            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+              <div><dt className="text-muted">Vreme</dt><dd className="mt-1 font-medium">{formatDateTime(new Date(last.startedAt))}</dd></div>
+              <div><dt className="text-muted">Period</dt><dd className="mt-1 font-medium">{last.periodLabel}{last.isDemo && <span className="ml-2 rounded bg-live/20 px-1.5 text-[10px] font-bold text-live">DEMO</span>}</dd></div>
+              <div><dt className="text-muted">Pregledano utakmica</dt><dd className="mt-1 font-medium tabular-nums">{last.fixturesScanned}</dd></div>
+              <div><dt className="text-muted">Pronađeno selekcija</dt><dd className="mt-1 font-medium tabular-nums">{last.selectionsFound}</dd></div>
+            </dl>
+          ) : (
+            <EmptyState title="Još nema skeniranja" text="Robot se pokreće isključivo ručno, dugmetom START ROBOT." />
+          )}
         </Card>
         <Card>
           <h2 className="mb-4 font-semibold">Pravila</h2>

@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
+  id           String      @id @default(cuid())
+  email        String      @unique
   passwordHash String
-  role         Role       @default(ADMIN)
-  createdAt    DateTime   @default(now())
+  role         Role        @default(ADMIN)
+  createdAt    DateTime    @default(now())
   sessions     Session[]
   auditLogs    AuditLog[]
+  robotScans   RobotScan[]
 }
 
 enum Role {
@@ -36,12 +37,14 @@ model Session {
 
 /// Globalna podešavanja aplikacije (jedan red, id = 1).
 model Settings {
-  id                Int      @id @default(1)
-  maxOdds           Decimal  @default(1.30) @db.Decimal(4, 2)
-  stakePerSelection Decimal  @default(1000) @db.Decimal(12, 2)
-  currency          String   @default("RSD")
-  timezone          String   @default("Europe/Belgrade")
-  updatedAt         DateTime @updatedAt
+  id                 Int      @id @default(1)
+  maxOdds            Decimal  @default(1.30) @db.Decimal(4, 2)
+  stakePerSelection  Decimal  @default(1000) @db.Decimal(12, 2)
+  currency           String   @default("RSD")
+  timezone           String   @default("Europe/Belgrade")
+  /// Zaštita kvote kod API provajdera: robot staje kada potroši ovoliko zahteva u jednom skeniranju.
+  maxRequestsPerScan Int      @default(60)
+  updatedAt          DateTime @updatedAt
 }
 
 model AuditLog {
@@ -58,4 +61,86 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+/// Tipovi koje robot prati: 1, X, 2, 2+ (više od 1.5 gola), 0–3 (manje od 3.5 gola).
+enum MarketType {
+  HOME
+  DRAW
+  AWAY
+  OVER_1_5
+  UNDER_3_5
+}
+
+enum ScanStatus {
+  RUNNING
+  COMPLETED
+  STOPPED
+  FAILED
+}
+
+model Match {
+  id                    String            @id @default(cuid())
+  provider              String
+  externalId            String
+  homeTeam              String
+  awayTeam              String
+  competition           String
+  country               String?
+  externalCompetitionId String?
+  kickoffTime           DateTime
+  sportType             String            @default("FOOTBALL")
+  matchStatus           String            @default("NOT_STARTED")
+  isDemo                Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  selections            MarketSelection[]
+
+  @@unique([provider, externalId])
+  @@index([kickoffTime])
+}
+
+/// Kvota u trenutku skeniranja. Nikada se ne prepisuje: svako skeniranje pravi nove zapise.
+model MarketSelection {
+  id            String     @id @default(cuid())
+  matchId       String
+  match         Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  scanId        String
+  scan          RobotScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  marketType    MarketType
+  odds          Decimal    @db.Decimal(8, 4)
+  oddsTimestamp DateTime
+  source        String
+  isDemo        Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+
+  @@unique([scanId, matchId, marketType])
+  @@index([matchId])
+}
+
+model RobotScan {
+  id               String            @id @default(cuid())
+  userId           String?
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider         String
+  isDemo           Boolean           @default(false)
+  periodLabel      String
+  startDate        DateTime
+  endDate          DateTime
+  startedAt        DateTime          @default(now())
+  finishedAt       DateTime?
+  status           ScanStatus        @default(RUNNING)
+  stopRequested    Boolean           @default(false)
+  maxOddsUsed      Decimal           @db.Decimal(4, 2)
+  fixturesTotal    Int?
+  fixturesScanned  Int               @default(0)
+  fixturesExcluded Int               @default(0)
+  selectionsFound  Int               @default(0)
+  requestsUsed     Int               @default(0)
+  errors           Json              @default("[]")
+  updatedAt        DateTime          @updatedAt
+  selections       MarketSelection[]
+
+  @@index([startedAt])
+  @@index([status])
 }

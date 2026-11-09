@@ -2,6 +2,7 @@ import { PageHeader, Card } from "@/components/ui";
 import { getSettings } from "@/lib/settings-repo";
 import { requireUser } from "@/lib/auth/session";
 import { SettingsForm } from "./SettingsForm";
+import { oddsPapiKey } from "@/lib/robot/providers";
 
 export default async function SettingsPage() {
   const [settings, user] = await Promise.all([getSettings(), requireUser()]);
@@ -11,13 +12,13 @@ export default async function SettingsPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <h2 className="mb-4 font-semibold">Pravila skeniranja i simulacije</h2>
-          <SettingsForm maxOdds={settings.maxOdds} stake={settings.stakePerSelection} />
+          <SettingsForm maxOdds={settings.maxOdds} stake={settings.stakePerSelection} maxRequests={settings.maxRequestsPerScan} />
         </Card>
         <div className="space-y-4">
           <Card>
             <h2 className="mb-3 font-semibold">Izvori podataka</h2>
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-3"><dt className="text-muted">Kvote</dt><dd>Nije podešeno (faza 2)</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-muted">Kvote</dt><dd>{oddsPapiKey() ? "Soccerbet preko OddsPapi" : "Samo DEMO (nema API ključa)"}</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-muted">Rezultati</dt><dd>Nije podešeno (faza 4)</dd></div>
             </dl>
           </Card>

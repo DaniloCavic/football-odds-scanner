@@ -22,6 +22,6 @@ export default defineConfig({
     command: `npx next start -p ${PORT}`,
     port: PORT,
     reuseExistingServer: false,
-    env: { ...E2E_ENV, NODE_ENV: "production" },
+    env: { ...E2E_ENV, NODE_ENV: "production", DEMO_DELAY_MS: "120", ODDSPAPI_API_KEY: "" },
   },
 });
