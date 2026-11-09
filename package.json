@@ -13,7 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "start:prod": "prisma migrate deploy && tsx prisma/seed.ts && next start -p ${PORT:-3000}"
+    "start:prod": "prisma migrate deploy && tsx prisma/seed.ts && next start -H 0.0.0.0 -p ${PORT:-3000}"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
