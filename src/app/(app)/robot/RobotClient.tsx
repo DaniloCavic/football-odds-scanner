@@ -6,7 +6,7 @@ import { IconRobot } from "@/components/icons";
 import type { ScanStatusDto, SelectionDto } from "@/lib/robot/scans";
 
 type Provider = { id: string; name: string; isDemo: boolean; available: boolean; reason?: string };
-type SourceStatus = { configured: boolean; ok?: boolean; error?: string; requestLimit?: number | null; requestCount?: number | null; hasSoccerbet?: boolean | null; hasFootball?: boolean | null };
+type SourceStatus = { similar?: string[]; configured: boolean; ok?: boolean; error?: string; requestLimit?: number | null; requestCount?: number | null; hasSoccerbet?: boolean | null; hasFootball?: boolean | null };
 
 const PERIODS = [
   ["today", "Danas"],
@@ -328,7 +328,12 @@ function SourceBox({ source, maxRequests }: { source: SourceStatus | null; maxRe
     <div className="rounded-xl border border-line bg-panel-2/50 p-4 text-sm">
       <h3 className="mb-2 font-semibold">OddsPapi nalog</h3>
       {!source ? <p className="text-muted">Proveravam…</p>
-        : !source.configured ? <p className="text-muted">API ključ nije podešen (<code>ODDSPAPI_API_KEY</code> na Railway-u). Dostupan je samo DEMO izvor.</p>
+        : !source.configured ? (
+          <div className="space-y-2 text-muted">
+            <p>API ključ nije podešen (<code>ODDSPAPI_API_KEY</code> na Railway-u). Dostupan je samo DEMO izvor.</p>
+            <p className="text-xs">Slične promenljive na serveru: {source.similar?.length ? <code className="text-live">{source.similar.join(", ")}</code> : "nema nijedne"}</p>
+          </div>
+        )
         : !source.ok ? <p className="text-lost">{source.error}</p>
         : (
           <dl className="space-y-1.5">

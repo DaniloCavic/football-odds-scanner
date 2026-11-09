@@ -9,7 +9,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!(await getCurrentUser())) return Response.json({ error: "Niste prijavljeni." }, { status: 401 });
   const key = oddsPapiKey();
-  if (!key) return Response.json({ configured: false });
+  if (!key) {
+    // Samo IMENA promenljivih koje liče na ključ (nikad vrednosti) – pomoć pri podešavanju.
+    const similar = Object.keys(process.env).filter((n) => /odds|papi/i.test(n));
+    return Response.json({ configured: false, similar });
+  }
   try {
     return Response.json({ configured: true, ok: true, ...(await getOddsPapiStatus(key)) });
   } catch (e) {
