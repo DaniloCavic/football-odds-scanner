@@ -138,6 +138,8 @@ model RobotScan {
   selectionsFound  Int               @default(0)
   requestsUsed     Int               @default(0)
   errors           Json              @default("[]")
+  /// Tehnički podaci za proveru izvora (broj kvota po tipu, tržišta izvora…)
+  diagnostics      Json              @default("{}")
   updatedAt        DateTime          @updatedAt
   selections       MarketSelection[]
 

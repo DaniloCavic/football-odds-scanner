@@ -224,6 +224,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
             <Stat label="Pronađeno selekcija" value={String(current.selectionsFound)} testId="found" />
             <Stat label="API zahteva" value={current.isDemo ? "0 (DEMO)" : String(current.requestsUsed)} />
           </dl>
+          <Diagnostics scan={current} />
           {current.errors.length > 0 && (
             <ul className="mt-4 space-y-1 rounded-lg bg-lost/10 px-3 py-2 text-sm text-lost">
               {current.errors.map((e, i) => <li key={i}>{e}</li>)}
@@ -357,5 +358,34 @@ function SourceBox({ source, maxRequests }: { source: SourceStatus | null; maxRe
         )}
       <p className="mt-3 text-xs text-muted">Provera naloga ne troši kvotu.</p>
     </div>
+  );
+}
+
+const TYPE_LABEL: Record<string, string> = { HOME: "1", DRAW: "X", AWAY: "2", OVER_1_5: "2+", UNDER_3_5: "0–3" };
+
+function Diagnostics({ scan }: { scan: ScanStatusDto }) {
+  const d = scan.diagnostics;
+  if (!d?.priceCounts || scan.status === "RUNNING") return null;
+  return (
+    <details className="mt-4 rounded-lg border border-line px-3 py-2 text-sm">
+      <summary className="cursor-pointer text-muted">Dijagnostika izvora</summary>
+      <table className="mt-3 w-full max-w-md text-left">
+        <thead className="text-muted"><tr><th className="py-1 font-medium">Tip</th><th className="font-medium">Kvota iz izvora</th><th className="font-medium">Do 1.30</th><th className="font-medium">Najniža</th></tr></thead>
+        <tbody>
+          {Object.entries(d.priceCounts).map(([k, v]) => (
+            <tr key={k} data-testid={`diag-${k}`}><td className="py-1 font-semibold">{TYPE_LABEL[k] ?? k}</td><td>{v.total}</td><td>{v.valid}</td><td>{v.min?.toFixed(2) ?? "—"}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      {d.marketMap && <p className="mt-3 break-all text-xs text-muted">Mapiranje tržišta: {JSON.stringify(d.marketMap)}</p>}
+      {d.soccerbetMarkets && d.soccerbetMarkets.length > 0 && (
+        <div className="mt-3 text-xs text-muted">
+          <p className="mb-1">Tržišta koja Soccerbet ima (najčešća):</p>
+          <ul className="grid gap-x-4 sm:grid-cols-2">
+            {d.soccerbetMarkets.map((m) => <li key={m.id}>{m.id}: {m.name} × {m.count}</li>)}
+          </ul>
+        </div>
+      )}
+    </details>
   );
 }

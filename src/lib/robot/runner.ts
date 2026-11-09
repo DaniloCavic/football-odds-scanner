@@ -34,6 +34,9 @@ export async function runScan(scanId: string): Promise<void> {
   const maxOdds = scan.maxOddsUsed.toNumber();
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
 
+  const diag: Record<string, unknown> = {};
+  const priceCounts: Record<string, { total: number; valid: number; min: number | null }> = {};
+  for (const m of MARKET_TYPES) priceCounts[m] = { total: 0, valid: 0, min: null };
   let lastStopCheck = 0;
   let stop = false;
   const ctx: ScanContext = {
@@ -55,6 +58,9 @@ export async function runScan(scanId: string): Promise<void> {
     async warn(msg) {
       await appendError(scanId, msg);
     },
+    async diagnostic(data) {
+      Object.assign(diag, data);
+    },
   };
 
   let finalStatus: "COMPLETED" | "STOPPED" | "FAILED" = "COMPLETED";
@@ -65,7 +71,14 @@ export async function runScan(scanId: string): Promise<void> {
         await prisma.robotScan.update({ where: { id: scanId }, data: { fixturesScanned: { increment: 1 }, fixturesExcluded: { increment: 1 } } });
         continue;
       }
+      for (const m of MARKET_TYPES) {
+        const p = fx.odds[m]?.price;
+        if (typeof p !== "number") continue;
+        priceCounts[m].total += 1;
+        priceCounts[m].min = priceCounts[m].min == null ? p : Math.min(priceCounts[m].min!, p);
+      }
       const valid = MARKET_TYPES.filter((m) => fx.odds[m] && isValidOdds(fx.odds[m]!.price, maxOdds));
+      for (const m of valid) priceCounts[m].valid += 1;
       let created = 0;
       if (valid.length) {
         const match = await prisma.match.upsert({
@@ -103,5 +116,8 @@ export async function runScan(scanId: string): Promise<void> {
       await appendError(scanId, msg);
     }
   }
-  await prisma.robotScan.update({ where: { id: scanId }, data: { status: finalStatus, finishedAt: new Date() } });
+  await prisma.robotScan.update({
+    where: { id: scanId },
+    data: { status: finalStatus, finishedAt: new Date(), diagnostics: JSON.parse(JSON.stringify({ priceCounts, ...diag })) },
+  });
 }

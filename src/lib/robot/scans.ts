@@ -23,6 +23,11 @@ export async function getScanStatus(id: string) {
     selectionsFound: s.selectionsFound,
     requestsUsed: s.requestsUsed,
     errors: Array.isArray(s.errors) ? (s.errors as string[]) : [],
+    diagnostics: (s.diagnostics ?? {}) as {
+      priceCounts?: Record<string, { total: number; valid: number; min: number | null }>;
+      soccerbetMarkets?: { id: string; count: number; name: string }[];
+      marketMap?: Record<string, string[]>;
+    },
   };
 }
 export type ScanStatusDto = NonNullable<Awaited<ReturnType<typeof getScanStatus>>>;

@@ -46,12 +46,22 @@ const withOdds = (f: OddsPapiFixture): OddsPapiFixture => ({
 describe("OddsPapi – mapiranje tržišta", () => {
   it("prepoznaje 1/X/2, više od 1.5 i manje od 3.5 (pun meč)", () => {
     expect(resolveOutcomeMap(MARKETS)).toEqual({
-      HOME: { marketId: "101", outcomeId: "101" },
-      DRAW: { marketId: "101", outcomeId: "102" },
-      AWAY: { marketId: "101", outcomeId: "103" },
-      OVER_1_5: { marketId: "1010", outcomeId: "1010" },
-      UNDER_3_5: { marketId: "1014", outcomeId: "1015" },
+      HOME: [{ marketId: "101", outcomeId: "101" }],
+      DRAW: [{ marketId: "101", outcomeId: "102" }],
+      AWAY: [{ marketId: "101", outcomeId: "103" }],
+      OVER_1_5: [{ marketId: "1010", outcomeId: "1010" }],
+      UNDER_3_5: [{ marketId: "1014", outcomeId: "1015" }],
     });
+  });
+
+  it("više kandidata za isto tržište: uzima onaj koji Soccerbet ima", () => {
+    const extra: OddsPapiMarket = { marketId: 9015, marketName: "Over Under Full Time", marketType: "totals", period: "fulltime", handicap: 1.5, playerProp: false, sportId: 10,
+      outcomes: [{ outcomeId: 9016, outcomeName: "Over" }, { outcomeId: 9017, outcomeName: "Under" }] };
+    const map = resolveOutcomeMap([...MARKETS, extra]);
+    expect(map.OVER_1_5).toHaveLength(2);
+    const f = fixture("x", 1);
+    f.bookmakerOdds = { "soccerbet.rs": { markets: { "9015": { outcomes: { "9016": price(1.22) } } } } };
+    expect(extractOdds(f, map).OVER_1_5?.price).toBe(1.22);
   });
 
   it("izvlači kvote Soccerbet-a, preskače neaktivne i suspendovane", () => {

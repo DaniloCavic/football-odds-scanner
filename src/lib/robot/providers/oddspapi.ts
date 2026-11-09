@@ -49,31 +49,30 @@ type OddsPapiBookmakerOdds = {
   }>;
 };
 
-/** Mapiranje naših tipova na OddsPapi (marketId, outcomeId). */
-export type OutcomeMap = Partial<Record<MarketTypeCode, { marketId: string; outcomeId: string }>>;
+/** Mapiranje naših tipova na OddsPapi (marketId, outcomeId). Može biti više kandidata po tipu. */
+export type OutcomeRef = { marketId: string; outcomeId: string };
+export type OutcomeMap = Partial<Record<MarketTypeCode, OutcomeRef[]>>;
 
-const EXCLUDED_TOTALS = /(team|home|away|asian|corner|card|booking|half|1st|2nd|player|exact|odd|even|both)/i;
+const EXCLUDED_TOTALS = /(team|home|away|asian|corner|card|booking|half|1st|2nd|player|exact|odd|even|both|btts|minute|interval|period|draw no|handicap|spread)/i;
 
 export function resolveOutcomeMap(markets: OddsPapiMarket[]): OutcomeMap {
-  const ft = markets.filter((m) => m.sportId === FOOTBALL_SPORT_ID && !m.playerProp && m.period === "fulltime");
+  const ft = markets.filter((m) => m.sportId === FOOTBALL_SPORT_ID && !m.playerProp && /^(fulltime|full_time|ft|regular)$/i.test(m.period));
   const map: OutcomeMap = {};
-  const oneX2 = ft.find((m) => m.marketType === "1x2" && m.outcomes.length === 3);
-  if (oneX2) {
-    const by = (n: string) => oneX2.outcomes.find((o) => o.outcomeName === n);
-    const [h, d, a] = [by("1"), by("X"), by("2")];
-    if (h) map.HOME = { marketId: String(oneX2.marketId), outcomeId: String(h.outcomeId) };
-    if (d) map.DRAW = { marketId: String(oneX2.marketId), outcomeId: String(d.outcomeId) };
-    if (a) map.AWAY = { marketId: String(oneX2.marketId), outcomeId: String(a.outcomeId) };
+  const add = (t: MarketTypeCode, m: OddsPapiMarket, outcomeName: RegExp) => {
+    const o = m.outcomes.find((x) => outcomeName.test(x.outcomeName.trim()));
+    if (o) (map[t] ??= []).push({ marketId: String(m.marketId), outcomeId: String(o.outcomeId) });
+  };
+  for (const m of ft.filter((x) => x.marketType === "1x2" && x.outcomes.length === 3 && !EXCLUDED_TOTALS.test(x.marketName))) {
+    add("HOME", m, /^1$/);
+    add("DRAW", m, /^x$/i);
+    add("AWAY", m, /^2$/);
   }
-  const totals = (line: number) =>
-    ft.find((m) => m.marketType === "totals" && m.handicap === line && /over\s*under/i.test(m.marketName) && !EXCLUDED_TOTALS.test(m.marketName)
-      && m.outcomes.some((o) => /^over$/i.test(o.outcomeName)) && m.outcomes.some((o) => /^under$/i.test(o.outcomeName)));
-  const o15 = totals(1.5);
-  const over = o15?.outcomes.find((o) => /^over$/i.test(o.outcomeName));
-  if (o15 && over) map.OVER_1_5 = { marketId: String(o15.marketId), outcomeId: String(over.outcomeId) };
-  const u35 = totals(3.5);
-  const under = u35?.outcomes.find((o) => /^under$/i.test(o.outcomeName));
-  if (u35 && under) map.UNDER_3_5 = { marketId: String(u35.marketId), outcomeId: String(under.outcomeId) };
+  const totals = (line: number) => ft.filter((m) => m.marketType === "totals" && Math.abs(m.handicap - line) < 1e-9
+    && !EXCLUDED_TOTALS.test(m.marketName)
+    && m.outcomes.length === 2
+    && m.outcomes.some((o) => /^over$/i.test(o.outcomeName.trim())) && m.outcomes.some((o) => /^under$/i.test(o.outcomeName.trim())));
+  for (const m of totals(1.5)) add("OVER_1_5", m, /^over$/i);
+  for (const m of totals(3.5)) add("UNDER_3_5", m, /^under$/i);
   return map;
 }
 
@@ -82,19 +81,24 @@ export function extractOdds(fx: OddsPapiFixture, map: OutcomeMap, slug = SOCCERB
   const book = fx.bookmakerOdds?.[slug];
   const out: ProviderFixture["odds"] = {};
   if (!book || book.bookmakerIsActive === false || book.suspended) return out;
-  for (const [type, ref] of Object.entries(map) as [MarketTypeCode, { marketId: string; outcomeId: string }][]) {
-    const market = book.markets?.[ref.marketId];
-    if (!market || market.marketActive === false) continue;
-    const player = market.outcomes?.[ref.outcomeId]?.players?.["0"];
-    if (!player || player.active === false || typeof player.price !== "number") continue;
-    const ts = player.bookmakerChangedAt ?? player.changedAt;
-    out[type] = { price: player.price, changedAt: ts ? new Date(ts) : new Date() };
+  for (const [type, refs] of Object.entries(map) as [MarketTypeCode, OutcomeRef[]][]) {
+    for (const ref of refs) {
+      const market = book.markets?.[ref.marketId];
+      if (!market || market.marketActive === false) continue;
+      const player = market.outcomes?.[ref.outcomeId]?.players?.["0"];
+      if (!player || player.active === false || typeof player.price !== "number") continue;
+      const ts = player.bookmakerChangedAt ?? player.changedAt;
+      out[type] = { price: player.price, changedAt: ts ? new Date(ts) : new Date() };
+      break;
+    }
   }
   return out;
 }
 
 export function toProviderFixture(fx: OddsPapiFixture, map: OutcomeMap): ProviderFixture {
+  const book = fx.bookmakerOdds?.[SOCCERBET_SLUG];
   return {
+    rawMarketIds: book?.markets ? Object.keys(book.markets) : [],
     externalId: fx.fixtureId,
     sport: fx.sportId === FOOTBALL_SPORT_ID ? "football" : "other",
     homeTeam: fx.participant1Name ?? "?",
@@ -165,7 +169,7 @@ export class OddsPapiClient {
   }
 }
 
-let marketsCache: { at: number; map: OutcomeMap } | null = null;
+let marketsCache: { at: number; map: OutcomeMap; names: Map<string, string> } | null = null;
 
 export function createOddsPapiProvider(apiKey: string, fetchImpl: Fetch = fetch, client = new OddsPapiClient(apiKey, fetchImpl)): OddsProvider {
   return {
@@ -184,11 +188,21 @@ export function createOddsPapiProvider(apiKey: string, fetchImpl: Fetch = fetch,
       // 1) Šifre tržišta (keš 24h)
       if (!marketsCache || Date.now() - marketsCache.at > 24 * 3600_000) {
         const markets = await call<OddsPapiMarket[]>("/markets", { language: "en" });
-        marketsCache = { at: Date.now(), map: resolveOutcomeMap(markets) };
+        marketsCache = {
+          at: Date.now(),
+          map: resolveOutcomeMap(markets),
+          names: new Map(markets.filter((m) => m.sportId === FOOTBALL_SPORT_ID).map((m) => [String(m.marketId), `${m.marketName} [${m.marketType}, ${m.period}, ${m.handicap}]`])),
+        };
       }
-      const map = marketsCache.map;
+      const { map, names } = marketsCache;
+      const seenMarkets = new Map<string, number>();
+      const emit = (f: ProviderFixture) => {
+        for (const id of f.rawMarketIds ?? []) seenMarkets.set(id, (seenMarkets.get(id) ?? 0) + 1);
+        return f;
+      };
       const missing = (["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).filter((t) => !map[t]);
       if (missing.length) await ctx.warn(`OddsPapi nema prepoznato tržište za: ${missing.join(", ")}. Ti tipovi se preskaču.`);
+      await ctx.diagnostic?.({ marketMap: Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v!.map((r) => `${r.marketId}/${r.outcomeId}`)])) });
 
       // 2) Utakmice sa Soccerbet kvotama u periodu (samo one koje nisu počele)
       const fixtures: OddsPapiFixture[] = [];
@@ -217,11 +231,15 @@ export function createOddsPapiProvider(apiKey: string, fetchImpl: Fetch = fetch,
           const base = wanted.get(fx.fixtureId);
           if (!base || seen.has(fx.fixtureId)) continue;
           seen.add(fx.fixtureId);
-          yield toProviderFixture({ ...base, ...fx, sportId: base.sportId, startTime: fx.startTime ?? base.startTime }, map);
+          yield emit(toProviderFixture({ ...base, ...fx, sportId: base.sportId, startTime: fx.startTime ?? base.startTime }, map));
         }
       }
       // Utakmice za koje Soccerbet nije vratio kvote se i dalje broje kao pregledane
       for (const [id, fx] of wanted) if (!seen.has(id)) yield toProviderFixture(fx, map);
+      // Dijagnostika: koja tržišta Soccerbet stvarno ima (najčešćih 40)
+      const top = [...seenMarkets.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40)
+        .map(([id, count]) => ({ id, count, name: names.get(id) ?? "?" }));
+      await ctx.diagnostic?.({ soccerbetMarkets: top });
     },
   };
 }

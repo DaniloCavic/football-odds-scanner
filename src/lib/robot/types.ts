@@ -11,6 +11,8 @@ export type ProviderFixture = {
   country: string | null;
   externalCompetitionId: string | null;
   kickoffTime: Date;
+  /** Šifre tržišta koje izvor ima za ovu utakmicu (samo za dijagnostiku). */
+  rawMarketIds?: string[];
   /** Kvote koje provajder trenutno nudi (bez ikakvog filtriranja). */
   odds: Partial<Record<MarketTypeCode, ProviderOdds>>;
 };
@@ -23,6 +25,7 @@ export type ScanContext = {
   countRequest: () => Promise<void>;
   maxRequests: number;
   warn: (msg: string) => Promise<void>;
+  diagnostic?: (data: Record<string, unknown>) => Promise<void>;
 };
 
 export type ProviderInfo = {
