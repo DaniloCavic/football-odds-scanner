@@ -33,9 +33,14 @@ function DemoBadge() {
   return <span className="rounded-md bg-live/20 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-live">DEMO</span>;
 }
 
-export function RobotClient({ providers, initialScans, today, maxOdds, maxRequests }: {
+export function RobotClient({ providers: serverProviders, initialScans, today, maxOdds, maxRequests }: {
   providers: Provider[]; initialScans: ScanStatusDto[]; today: string; maxOdds: number; maxRequests: number;
 }) {
+  const [source, setSource] = useState<SourceStatus | null>(null);
+  const [touched, setTouched] = useState(false);
+  // Ako provera naloga kaže da ključ radi, OddsPapi je dostupan i bez osvežavanja stranice.
+  const providers = useMemo(() => serverProviders.map((p) =>
+    !p.isDemo && source?.configured && source.ok ? { ...p, available: true, reason: undefined } : p), [serverProviders, source]);
   const [period, setPeriod] = useState<PeriodKey>("today");
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -46,12 +51,17 @@ export function RobotClient({ providers, initialScans, today, maxOdds, maxReques
   const [selections, setSelections] = useState<SelectionDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [source, setSource] = useState<SourceStatus | null>(null);
   const [q, setQ] = useState("");
   const [types, setTypes] = useState<string[]>([]);
   const [sort, setSort] = useState<"time" | "odds">("time");
 
   const running = current?.status === "RUNNING";
+
+  useEffect(() => {
+    if (touched || running) return;
+    const real = providers.find((p) => !p.isDemo && p.available);
+    if (real && providerId !== real.id) setProviderId(real.id);
+  }, [providers, touched, running, providerId]);
 
   const loadSelections = useCallback(async (id: string) => {
     const r = await fetch(`/api/robot/scans/${id}/selections`, { cache: "no-store" });
@@ -161,7 +171,7 @@ export function RobotClient({ providers, initialScans, today, maxOdds, maxReques
               {providers.map((p) => (
                 <label key={p.id} className={`flex flex-1 cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${providerId === p.id ? "border-accent/60 bg-accent/5" : "border-line"} ${!p.available ? "cursor-not-allowed opacity-50" : ""}`}>
                   <input type="radio" name="provider" value={p.id} checked={providerId === p.id} disabled={!p.available || running}
-                    onChange={() => setProviderId(p.id)} className="mt-0.5 accent-[var(--color-accent)]" />
+                    onChange={() => { setTouched(true); setProviderId(p.id); }} className="mt-0.5 accent-[var(--color-accent)]" />
                   <span>
                     <span className="flex items-center gap-2 font-medium">{p.name} {p.isDemo && <DemoBadge />}</span>
                     {p.reason && <span className="block text-xs text-muted">{p.reason}</span>}
