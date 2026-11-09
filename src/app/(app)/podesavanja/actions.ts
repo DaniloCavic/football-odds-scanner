@@ -1,0 +1,40 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/auth/session";
+import { normalizeDecimal, settingsSchema } from "@/lib/settings";
+import { getSettings } from "@/lib/settings-repo";
+
+export type SettingsState = { ok?: boolean; error?: string };
+
+export async function saveSettingsAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") return { error: "Samo administrator može da menja podešavanja." };
+
+  const parsed = settingsSchema.safeParse({
+    maxOdds: normalizeDecimal(formData.get("maxOdds")),
+    stakePerSelection: normalizeDecimal(formData.get("stakePerSelection")),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const before = await getSettings();
+  const next = parsed.data;
+  if (before.maxOdds === next.maxOdds && before.stakePerSelection === next.stakePerSelection) return { ok: true };
+
+  await prisma.$transaction([
+    prisma.settings.update({ where: { id: 1 }, data: { maxOdds: next.maxOdds, stakePerSelection: next.stakePerSelection } }),
+    prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        entityType: "Settings",
+        entityId: "1",
+        action: "UPDATE",
+        oldValue: { maxOdds: before.maxOdds, stakePerSelection: before.stakePerSelection },
+        newValue: next,
+      },
+    }),
+  ]);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
