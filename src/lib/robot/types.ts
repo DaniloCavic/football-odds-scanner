@@ -30,6 +30,8 @@ export type ScanContext = {
 
 export type ProviderInfo = {
   id: string;
+  /** Utakmice istog izvora podataka dele ID-jeve (npr. sve OddsPapi kladionice). */
+  matchNamespace?: string;
   name: string;
   /** Tekst izvora koji se čuva uz svaku kvotu. */
   sourceLabel: string;

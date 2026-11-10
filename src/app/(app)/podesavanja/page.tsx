@@ -18,7 +18,7 @@ export default async function SettingsPage() {
           <Card>
             <h2 className="mb-3 font-semibold">Izvori podataka</h2>
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-3"><dt className="text-muted">Kvote</dt><dd>{oddsPapiKey() ? "Soccerbet preko OddsPapi" : "Samo DEMO (nema API ključa)"}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-muted">Kvote</dt><dd>{oddsPapiKey() ? "OddsPapi (srpske kladionice)" : "Samo DEMO (nema API ključa)"}</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-muted">Rezultati</dt><dd>Nije podešeno (faza 4)</dd></div>
             </dl>
           </Card>

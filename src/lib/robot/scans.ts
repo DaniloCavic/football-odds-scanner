@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { MARKET_LABELS, type MarketTypeCode } from "@/lib/odds";
+import { providerName } from "./providers";
 
 export async function getScanStatus(id: string) {
   const s = await prisma.robotScan.findUnique({ where: { id } });
@@ -8,6 +9,7 @@ export async function getScanStatus(id: string) {
   return {
     id: s.id,
     provider: s.provider,
+    providerName: providerName(s.provider),
     isDemo: s.isDemo,
     periodLabel: s.periodLabel,
     startDate: s.startDate.toISOString(),
@@ -26,6 +28,7 @@ export async function getScanStatus(id: string) {
     diagnostics: (s.diagnostics ?? {}) as {
       priceCounts?: Record<string, { total: number; valid: number; min: number | null }>;
       soccerbetMarkets?: { id: string; count: number; name: string }[];
+      bookmakerMarkets?: { id: string; count: number; name: string }[];
       marketMap?: Record<string, string[]>;
     },
   };

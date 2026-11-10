@@ -5,8 +5,8 @@ import { Card, EmptyState } from "@/components/ui";
 import { IconRobot } from "@/components/icons";
 import type { ScanStatusDto, SelectionDto } from "@/lib/robot/scans";
 
-type Provider = { id: string; name: string; isDemo: boolean; available: boolean; reason?: string };
-type SourceStatus = { similar?: string[]; configured: boolean; ok?: boolean; error?: string; requestLimit?: number | null; requestCount?: number | null; hasSoccerbet?: boolean | null; hasFootball?: boolean | null };
+type Provider = { id: string; name: string; isDemo: boolean; available: boolean; reason?: string; bookmakerSlug?: string };
+type SourceStatus = { similar?: string[]; configured: boolean; ok?: boolean; error?: string; requestLimit?: number | null; requestCount?: number | null; hasSoccerbet?: boolean | null; hasFootball?: boolean | null; bookmakers?: string[] | null };
 
 const PERIODS = [
   ["today", "Danas"],
@@ -39,8 +39,11 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
   const [source, setSource] = useState<SourceStatus | null>(null);
   const [touched, setTouched] = useState(false);
   // Ako provera naloga kaže da ključ radi, OddsPapi je dostupan i bez osvežavanja stranice.
-  const providers = useMemo(() => serverProviders.map((p) =>
-    !p.isDemo && source?.configured && source.ok ? { ...p, available: true, reason: undefined } : p), [serverProviders, source]);
+  const providers = useMemo(() => serverProviders.map((p) => {
+    if (p.isDemo || !source?.configured || !source.ok) return p;
+    const inPlan = !source.bookmakers || !p.bookmakerSlug || source.bookmakers.includes(p.bookmakerSlug);
+    return inPlan ? { ...p, available: true, reason: undefined } : { ...p, available: false, reason: "Nije u vašem OddsPapi paketu" };
+  }), [serverProviders, source]);
   const [period, setPeriod] = useState<PeriodKey>("today");
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -59,9 +62,16 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
 
   useEffect(() => {
     if (touched || running) return;
-    const real = providers.find((p) => !p.isDemo && p.available);
-    if (real && providerId !== real.id) setProviderId(real.id);
+    let saved: string | null = null;
+    try { saved = localStorage.getItem("fos.robot.provider"); } catch {}
+    const pick = providers.find((p) => p.id === saved && p.available) ?? providers.find((p) => !p.isDemo && p.available);
+    if (pick && providerId !== pick.id) setProviderId(pick.id);
   }, [providers, touched, running, providerId]);
+
+  useEffect(() => {
+    const p = providers.find((x) => x.id === providerId);
+    if (p && !p.available) setProviderId(providers.find((x) => x.available)!.id);
+  }, [providers, providerId]);
 
   const loadSelections = useCallback(async (id: string) => {
     const r = await fetch(`/api/robot/scans/${id}/selections`, { cache: "no-store" });
@@ -166,16 +176,18 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
               </div>
             )}
 
-            <h2 className="mb-3 mt-6 font-semibold">Izvor kvota</h2>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <h2 className="mb-1 mt-6 font-semibold">Kladionica (izvor kvota)</h2>
+            <p className="mb-3 text-xs text-muted">Kvote preko OddsPapi. Kladionice se razlikuju po broju utakmica i tipova – pogledajte „Dijagnostiku izvora“ posle skeniranja.</p>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {providers.map((p) => (
-                <label key={p.id} className={`flex flex-1 cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${providerId === p.id ? "border-accent/60 bg-accent/5" : "border-line"} ${!p.available ? "cursor-not-allowed opacity-50" : ""}`}>
+                <label key={p.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${providerId === p.id ? "border-accent/60 bg-accent/5" : "border-line"} ${!p.available ? "cursor-not-allowed opacity-50" : ""}`}>
                   <input type="radio" name="provider" value={p.id} checked={providerId === p.id} disabled={!p.available || running}
-                    onChange={() => { setTouched(true); setProviderId(p.id); }} className="mt-0.5 accent-[var(--color-accent)]" />
+                    onChange={() => { setTouched(true); setProviderId(p.id); try { localStorage.setItem("fos.robot.provider", p.id); } catch {} }} className="mt-0.5 accent-[var(--color-accent)]" />
                   <span>
                     <span className="flex items-center gap-2 font-medium">{p.name} {p.isDemo && <DemoBadge />}</span>
                     {p.reason && <span className="block text-xs text-muted">{p.reason}</span>}
-                    {p.isDemo && <span className="block text-xs text-muted">Izmišljene utakmice, samo za probu toka.</span>}
+                    {p.isDemo ? <span className="block text-xs text-muted">Izmišljene utakmice, samo za probu toka.</span>
+                      : !p.reason && <span className="block text-xs text-muted">preko OddsPapi</span>}
                   </span>
                 </label>
               ))}
@@ -207,7 +219,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
         <Card>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-semibold">
-              Skeniranje: {current.periodLabel} {current.isDemo && <DemoBadge />}
+              Skeniranje: {current.periodLabel} · {current.providerName} {current.isDemo && <DemoBadge />}
             </h2>
             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_LABEL[current.status][1]}`} data-testid="scan-status">
               {STATUS_LABEL[current.status][0]}
@@ -312,7 +324,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
                 <button type="button" onClick={() => !running && setCurrent(s)} disabled={running}
                   className={`flex w-full flex-wrap items-center gap-x-4 gap-y-1 py-2.5 text-left hover:text-accent ${current?.id === s.id ? "text-accent" : ""}`}>
                   <span className="w-28 text-muted">{fmt.format(new Date(s.startedAt))}</span>
-                  <span className="flex items-center gap-2">{s.periodLabel} {s.isDemo && <DemoBadge />}</span>
+                  <span className="flex items-center gap-2">{s.periodLabel} · {s.providerName} {s.isDemo && <DemoBadge />}</span>
                   <span className="text-muted">{s.selectionsFound} selekcija</span>
                   <span className={`ml-auto rounded-full px-2 py-0.5 text-xs ${STATUS_LABEL[s.status][1]}`}>{STATUS_LABEL[s.status][0]}</span>
                 </button>
@@ -351,8 +363,8 @@ function SourceBox({ source, maxRequests }: { source: SourceStatus | null; maxRe
             <div className="flex justify-between gap-3"><dt className="text-muted">Veza</dt><dd className="text-won">Radi</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-muted">Potrošeno ovog meseca</dt>
               <dd className="tabular-nums">{source.requestCount ?? "?"} / {source.requestLimit ?? "∞"}</dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-muted">Soccerbet u paketu</dt>
-              <dd className={source.hasSoccerbet === false ? "text-lost" : ""}>{source.hasSoccerbet == null ? "?" : source.hasSoccerbet ? "Da" : "Ne"}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-muted">Kladionice u paketu</dt>
+              <dd>{source.bookmakers ? "ograničen spisak" : "sve"}</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-muted">Limit po skeniranju</dt><dd className="tabular-nums">{maxRequests}</dd></div>
           </dl>
         )}
@@ -366,6 +378,7 @@ const TYPE_LABEL: Record<string, string> = { HOME: "1", DRAW: "X", AWAY: "2", OV
 function Diagnostics({ scan }: { scan: ScanStatusDto }) {
   const d = scan.diagnostics;
   if (!d?.priceCounts || scan.status === "RUNNING") return null;
+  const markets = d.bookmakerMarkets ?? d.soccerbetMarkets;
   return (
     <details className="mt-4 rounded-lg border border-line px-3 py-2 text-sm">
       <summary className="cursor-pointer text-muted">Dijagnostika izvora</summary>
@@ -378,11 +391,11 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
         </tbody>
       </table>
       {d.marketMap && <p className="mt-3 break-all text-xs text-muted">Mapiranje tržišta: {JSON.stringify(d.marketMap)}</p>}
-      {d.soccerbetMarkets && d.soccerbetMarkets.length > 0 && (
+      {markets && markets.length > 0 && (
         <div className="mt-3 text-xs text-muted">
-          <p className="mb-1">Tržišta koja Soccerbet ima (najčešća):</p>
+          <p className="mb-1">Tržišta koja {scan.providerName} ima (najčešća):</p>
           <ul className="grid gap-x-4 sm:grid-cols-2">
-            {d.soccerbetMarkets.map((m) => <li key={m.id}>{m.id}: {m.name} × {m.count}</li>)}
+            {markets.map((m) => <li key={m.id}>{m.id}: {m.name} × {m.count}</li>)}
           </ul>
         </div>
       )}

@@ -57,7 +57,7 @@ export function demoFixtures(from: Date, to: Date): ProviderFixture[] {
 
 export const demoProvider: OddsProvider = {
   id: "demo",
-  name: "DEMO podaci (izmišljeni)",
+  name: "Probni podaci",
   sourceLabel: "DEMO",
   isDemo: true,
   async *scan(range, ctx) {

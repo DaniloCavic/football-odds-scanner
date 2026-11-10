@@ -82,9 +82,9 @@ export async function runScan(scanId: string): Promise<void> {
       let created = 0;
       if (valid.length) {
         const match = await prisma.match.upsert({
-          where: { provider_externalId: { provider: provider.id, externalId: fx.externalId } },
+          where: { provider_externalId: { provider: provider.matchNamespace ?? provider.id, externalId: fx.externalId } },
           create: {
-            provider: provider.id, externalId: fx.externalId, homeTeam: fx.homeTeam, awayTeam: fx.awayTeam,
+            provider: provider.matchNamespace ?? provider.id, externalId: fx.externalId, homeTeam: fx.homeTeam, awayTeam: fx.awayTeam,
             competition: fx.competition, country: fx.country, externalCompetitionId: fx.externalCompetitionId,
             kickoffTime: fx.kickoffTime, isDemo: provider.isDemo,
           },

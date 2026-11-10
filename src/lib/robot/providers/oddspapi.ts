@@ -8,6 +8,17 @@ import { ProviderError, RequestLimitReached, type OddsProvider, type ProviderFix
  */
 export const ODDSPAPI_BASE = "https://api.oddspapi.io/v4";
 export const SOCCERBET_SLUG = "soccerbet.rs";
+
+/** Srpske kladionice koje OddsPapi nudi (slug → naziv). */
+export const ODDSPAPI_BOOKMAKERS = [
+  { slug: "soccerbet.rs", name: "Soccerbet" },
+  { slug: "mozzartbet", name: "Mozzart" },
+  { slug: "maxbet.rs", name: "MaxBet" },
+  { slug: "admiralbet.rs", name: "AdmiralBet" },
+  { slug: "superbet.rs", name: "Superbet" },
+  { slug: "balkanbet.rs", name: "BalkanBet" },
+] as const;
+export type OddsPapiBookmaker = { slug: string; name: string };
 export const FOOTBALL_SPORT_ID = 10;
 const COOLDOWN_MS = 1100;
 const MAX_RANGE_MS = 9 * 24 * 3600_000; // /v4/fixtures dozvoljava manje od 10 dana
@@ -95,8 +106,8 @@ export function extractOdds(fx: OddsPapiFixture, map: OutcomeMap, slug = SOCCERB
   return out;
 }
 
-export function toProviderFixture(fx: OddsPapiFixture, map: OutcomeMap): ProviderFixture {
-  const book = fx.bookmakerOdds?.[SOCCERBET_SLUG];
+export function toProviderFixture(fx: OddsPapiFixture, map: OutcomeMap, slug = SOCCERBET_SLUG): ProviderFixture {
+  const book = fx.bookmakerOdds?.[slug];
   return {
     rawMarketIds: book?.markets ? Object.keys(book.markets) : [],
     externalId: fx.fixtureId,
@@ -107,7 +118,7 @@ export function toProviderFixture(fx: OddsPapiFixture, map: OutcomeMap): Provide
     country: fx.categoryName ?? null,
     externalCompetitionId: fx.tournamentId != null ? String(fx.tournamentId) : null,
     kickoffTime: new Date(fx.startTime),
-    odds: extractOdds(fx, map),
+    odds: extractOdds(fx, map, slug),
   };
 }
 
@@ -171,11 +182,18 @@ export class OddsPapiClient {
 
 let marketsCache: { at: number; map: OutcomeMap; names: Map<string, string> } | null = null;
 
-export function createOddsPapiProvider(apiKey: string, fetchImpl: Fetch = fetch, client = new OddsPapiClient(apiKey, fetchImpl)): OddsProvider {
+export function createOddsPapiProvider(
+  apiKey: string,
+  fetchImpl: Fetch = fetch,
+  client = new OddsPapiClient(apiKey, fetchImpl),
+  bookmaker: OddsPapiBookmaker = ODDSPAPI_BOOKMAKERS[0],
+): OddsProvider {
+  const slug = bookmaker.slug;
   return {
-    id: "oddspapi-soccerbet",
-    name: "Soccerbet (preko OddsPapi)",
-    sourceLabel: "Soccerbet · OddsPapi",
+    id: `oddspapi:${slug}`,
+    matchNamespace: "oddspapi",
+    name: bookmaker.name,
+    sourceLabel: `${bookmaker.name} · OddsPapi`,
     isDemo: false,
     async *scan(range, ctx) {
       let used = 0;
@@ -209,7 +227,7 @@ export function createOddsPapiProvider(apiKey: string, fetchImpl: Fetch = fetch,
       for (const part of splitRange(range.from, range.to)) {
         if (await ctx.shouldStop()) return;
         const list = await call<OddsPapiFixture[]>("/fixtures", {
-          sportId: FOOTBALL_SPORT_ID, from: iso(part.from), to: iso(part.to), statusId: 0, hasOdds: true, bookmakers: SOCCERBET_SLUG,
+          sportId: FOOTBALL_SPORT_ID, from: iso(part.from), to: iso(part.to), statusId: 0, hasOdds: true, bookmakers: slug,
         });
         fixtures.push(...list.filter((f) => f.sportId === FOOTBALL_SPORT_ID));
       }
@@ -224,22 +242,22 @@ export function createOddsPapiProvider(apiKey: string, fetchImpl: Fetch = fetch,
         if (await ctx.shouldStop()) return;
         const ids = tournaments.slice(i, i + TOURNAMENTS_PER_CALL);
         const data = await call<OddsPapiFixture[] | Record<string, OddsPapiFixture>>("/odds-by-tournaments", {
-          tournamentIds: ids.join(","), bookmaker: SOCCERBET_SLUG, oddsFormat: "decimal", language: "en",
+          tournamentIds: ids.join(","), bookmaker: slug, oddsFormat: "decimal", language: "en",
         });
         const list = Array.isArray(data) ? data : Object.values(data);
         for (const fx of list) {
           const base = wanted.get(fx.fixtureId);
           if (!base || seen.has(fx.fixtureId)) continue;
           seen.add(fx.fixtureId);
-          yield emit(toProviderFixture({ ...base, ...fx, sportId: base.sportId, startTime: fx.startTime ?? base.startTime }, map));
+          yield emit(toProviderFixture({ ...base, ...fx, sportId: base.sportId, startTime: fx.startTime ?? base.startTime }, map, slug));
         }
       }
       // Utakmice za koje Soccerbet nije vratio kvote se i dalje broje kao pregledane
-      for (const [id, fx] of wanted) if (!seen.has(id)) yield toProviderFixture(fx, map);
+      for (const [id, fx] of wanted) if (!seen.has(id)) yield toProviderFixture(fx, map, slug);
       // Dijagnostika: koja tržišta Soccerbet stvarno ima (najčešćih 40)
       const top = [...seenMarkets.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40)
         .map(([id, count]) => ({ id, count, name: names.get(id) ?? "?" }));
-      await ctx.diagnostic?.({ soccerbetMarkets: top });
+      await ctx.diagnostic?.({ bookmakerMarkets: top });
     },
   };
 }
@@ -259,6 +277,8 @@ export async function getOddsPapiStatus(apiKey: string, fetchImpl: Fetch = fetch
     requestLimit: sub?.request_limit ?? null,
     requestCount: sub?.request_count ?? null,
     hasSoccerbet: books ? books.length === 0 || books.includes(SOCCERBET_SLUG) : null,
+    /** null = paket ne ograničava kladionice */
+    bookmakers: books && books.length ? books : null,
     hasFootball: sub?.sport_ids ? sub.sport_ids.includes(FOOTBALL_SPORT_ID) : null,
   };
 }

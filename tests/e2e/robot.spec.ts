@@ -13,7 +13,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("bez API ključa OddsPapi je isključen, a DEMO izabran", async ({ page }) => {
-  await expect(page.getByRole("radio", { name: /OddsPapi/ })).toBeDisabled();
+  for (const name of ["Soccerbet", "Mozzart", "MaxBet", "AdmiralBet", "Superbet", "BalkanBet"]) {
+    await expect(page.getByRole("radio", { name: new RegExp(`^${name}`) })).toBeDisabled();
+  }
   await expect(page.getByRole("radio", { name: /DEMO/ })).toBeChecked();
   await expect(page.getByText("API ključ nije podešen")).toBeVisible();
 });

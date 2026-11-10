@@ -197,3 +197,31 @@ describe("OddsPapi – skeniranje", () => {
       .rejects.toBeInstanceOf(RequestLimitReached);
   });
 });
+
+describe("OddsPapi – druga kladionica", () => {
+  it("koristi slug izabrane kladionice za utakmice i kvote", async () => {
+    const calls: URL[] = [];
+    const fn = (async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      calls.push(url);
+      let body: unknown = [];
+      if (url.pathname === "/v4/markets") body = MARKETS;
+      if (url.pathname === "/v4/fixtures") body = [fixture("m1", 7)];
+      if (url.pathname === "/v4/odds-by-tournaments") {
+        const f = fixture("m1", 7);
+        f.bookmakerOdds = { "maxbet.rs": { markets: { "1010": { outcomes: { "1010": price(1.2) } }, "1014": { outcomes: { "1015": price(1.28) } } } } };
+        body = [f];
+      }
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as unknown as typeof fetch;
+    const provider = createOddsPapiProvider("k", fn, new OddsPapiClient("k", fn, 0, noSleep), { slug: "maxbet.rs", name: "MaxBet" });
+    expect(provider.id).toBe("oddspapi:maxbet.rs");
+    expect(provider.matchNamespace).toBe("oddspapi");
+    const out: ProviderFixture[] = [];
+    for await (const f of provider.scan({ from: new Date("2026-11-10T00:00:00Z"), to: new Date("2026-11-11T00:00:00Z") }, ctx())) out.push(f);
+    expect(calls.find((u) => u.pathname === "/v4/fixtures")!.searchParams.get("bookmakers")).toBe("maxbet.rs");
+    expect(calls.find((u) => u.pathname === "/v4/odds-by-tournaments")!.searchParams.get("bookmaker")).toBe("maxbet.rs");
+    expect(out[0].odds.OVER_1_5?.price).toBe(1.2);
+    expect(out[0].odds.UNDER_3_5?.price).toBe(1.28);
+  });
+});
