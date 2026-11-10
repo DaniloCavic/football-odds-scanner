@@ -11,9 +11,9 @@ export const SOCCERBET_SLUG = "soccerbet.rs";
 
 /** Srpske kladionice koje OddsPapi nudi (slug → naziv). */
 export const ODDSPAPI_BOOKMAKERS = [
+  { slug: "maxbet.rs", name: "MaxBet" },
   { slug: "soccerbet.rs", name: "Soccerbet" },
   { slug: "mozzartbet", name: "Mozzart" },
-  { slug: "maxbet.rs", name: "MaxBet" },
   { slug: "admiralbet.rs", name: "AdmiralBet" },
   { slug: "superbet.rs", name: "Superbet" },
   { slug: "balkanbet.rs", name: "BalkanBet" },
@@ -186,7 +186,7 @@ export function createOddsPapiProvider(
   apiKey: string,
   fetchImpl: Fetch = fetch,
   client = new OddsPapiClient(apiKey, fetchImpl),
-  bookmaker: OddsPapiBookmaker = ODDSPAPI_BOOKMAKERS[0],
+  bookmaker: OddsPapiBookmaker = ODDSPAPI_BOOKMAKERS.find((b) => b.slug === SOCCERBET_SLUG)!,
 ): OddsProvider {
   const slug = bookmaker.slug;
   return {
@@ -214,6 +214,15 @@ export function createOddsPapiProvider(
       }
       const { map, names } = marketsCache;
       const seenMarkets = new Map<string, number>();
+      // Uzorak sirovih podataka za mapirana tržišta (prva utakmica gde ih kladionica ima)
+      const mappedIds = new Set(Object.values(map).flat().map((r) => r!.marketId));
+      const samples: Record<string, unknown> = {};
+      const sample = (fx: OddsPapiFixture) => {
+        const markets = fx.bookmakerOdds?.[slug]?.markets ?? {};
+        for (const id of Object.keys(markets)) {
+          if (mappedIds.has(id) && !(id in samples)) samples[id] = markets[id];
+        }
+      };
       const emit = (f: ProviderFixture) => {
         for (const id of f.rawMarketIds ?? []) seenMarkets.set(id, (seenMarkets.get(id) ?? 0) + 1);
         return f;
@@ -249,6 +258,7 @@ export function createOddsPapiProvider(
           const base = wanted.get(fx.fixtureId);
           if (!base || seen.has(fx.fixtureId)) continue;
           seen.add(fx.fixtureId);
+          try { sample(fx); } catch { /* dijagnostika ne sme da obori skeniranje */ }
           yield emit(toProviderFixture({ ...base, ...fx, sportId: base.sportId, startTime: fx.startTime ?? base.startTime }, map, slug));
         }
       }
@@ -257,7 +267,7 @@ export function createOddsPapiProvider(
       // Dijagnostika: koja tržišta Soccerbet stvarno ima (najčešćih 40)
       const top = [...seenMarkets.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40)
         .map(([id, count]) => ({ id, count, name: names.get(id) ?? "?" }));
-      await ctx.diagnostic?.({ bookmakerMarkets: top });
+      await ctx.diagnostic?.({ bookmakerMarkets: top, rawSamples: samples });
     },
   };
 }

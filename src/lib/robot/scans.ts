@@ -30,6 +30,7 @@ export async function getScanStatus(id: string) {
       soccerbetMarkets?: { id: string; count: number; name: string }[];
       bookmakerMarkets?: { id: string; count: number; name: string }[];
       marketMap?: Record<string, string[]>;
+      rawSamples?: Record<string, unknown>;
     },
   };
 }

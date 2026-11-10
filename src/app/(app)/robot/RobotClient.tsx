@@ -391,6 +391,12 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
         </tbody>
       </table>
       {d.marketMap && <p className="mt-3 break-all text-xs text-muted">Mapiranje tržišta: {JSON.stringify(d.marketMap)}</p>}
+      {d.rawSamples && Object.keys(d.rawSamples).length > 0 && (
+        <div className="mt-3 text-xs text-muted">
+          <p className="mb-1">Uzorak podataka za mapirana tržišta (jedna utakmica):</p>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2 text-[11px]">{JSON.stringify(d.rawSamples, null, 1)}</pre>
+        </div>
+      )}
       {markets && markets.length > 0 && (
         <div className="mt-3 text-xs text-muted">
           <p className="mb-1">Tržišta koja {scan.providerName} ima (najčešća):</p>
