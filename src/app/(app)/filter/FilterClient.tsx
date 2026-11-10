@@ -92,6 +92,23 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
     } catch (e) { flash((e as Error).message, "err"); }
   }
 
+  const [bulkBusy, setBulkBusy] = useState(false);
+  async function addAll(list: SelectionDto[]) {
+    if (!setId || !activeSet) return flash("Prvo napravite ili izaberite filter (desno).", "err");
+    if (list.length === 0) return flash("Svi vidljivi tipovi su već u filteru.", "err");
+    const total = list.length * activeSet.stakePerSelection;
+    if (!window.confirm(`Dodati ${list.length} tipova u filter „${activeSet.name}“?\nPlanirani ulog: ${rsd(total)}`)) return;
+    setBulkBusy(true);
+    try {
+      const r = await api<{ added: number; duplicate: number; started: number; invalid: number }>(`/api/filter-sets/${setId}/entries/bulk`, {
+        method: "POST", body: JSON.stringify({ marketSelectionIds: list.map((s) => s.id) }),
+      });
+      const skipped = [r.duplicate && `${r.duplicate} već u filteru`, r.started && `${r.started} počelo`, r.invalid && `${r.invalid} neispravno`].filter(Boolean).join(", ");
+      flash(`Dodato ${r.added} tipova${skipped ? ` (preskočeno: ${skipped})` : ""}.`);
+      await Promise.all([refreshEntries(setId), refreshSets()]);
+    } catch (e) { flash((e as Error).message, "err"); } finally { setBulkBusy(false); }
+  }
+
   async function remove(entry: FilterEntryDto) {
     if (!setId) return;
     try {
@@ -229,7 +246,18 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                   <input value={maxOdds} onChange={(e) => setMaxOdds(e.target.value)} placeholder="do" aria-label="Kvota do" inputMode="decimal" className={`${inputCls} w-full`} />
                 </div>
               </div>
-              <p className="mb-3 text-xs text-muted">{filtered.length} tipova · prevucite tip u filter ili kliknite <b>+</b></p>
+              {(() => {
+                const addable = filtered.filter((s) => !inFilter.has(`${s.matchId}|${s.marketType}`) && new Date(s.kickoffTime).getTime() > now);
+                return (
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-muted">{filtered.length} tipova · prevucite tip u filter ili kliknite <b>+</b></p>
+                    <button type="button" onClick={() => addAll(addable)} disabled={bulkBusy || !activeSet || addable.length === 0}
+                      className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-bg hover:bg-accent-strong disabled:opacity-40">
+                      {bulkBusy ? "Dodajem…" : `Dodaj sve u filter (${addable.length})`}
+                    </button>
+                  </div>
+                );
+              })()}
               {filtered.length === 0 ? <EmptyState title="Nema tipova" text="Promenite pretragu ili filtere." /> : (
                 <ul className="max-h-[70vh] space-y-2 overflow-y-auto pr-1" data-testid="left-list">
                   {groups.map((rows) => {

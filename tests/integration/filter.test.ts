@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { addEntry, clearFilterSet, createFilterSet, deleteFilterSet, listEntries, listFilterSets, removeEntry } from "@/lib/filter/service";
+import { addEntries, addEntry, clearFilterSet, createFilterSet, deleteFilterSet, listEntries, listFilterSets, removeEntry } from "@/lib/filter/service";
 
 const db = new PrismaClient();
 const HOUR = 3600_000;
@@ -103,6 +103,17 @@ describe("filter – trajno čuvanje i pravila", () => {
   it("naziv je obavezan i ograničen", async () => {
     await expect(createFilterSet(db, { name: "   ", userId: null, stake: 1000 })).rejects.toThrow(/naziv/);
     await expect(createFilterSet(db, { name: "x".repeat(81), userId: null, stake: 1000 })).rejects.toThrow(/80/);
+  });
+
+  it("dodaj sve: dodaje nove, preskače duplikate, počele i neispravne", async () => {
+    const a = await seed();
+    const old = await seed(-1);
+    const setId = await createFilterSet(db, { name: "Sve", userId: null, stake: 1000 });
+    await addEntry(db, { filterSetId: setId, marketSelectionId: a.home.id, maxOdds: 1.3 });
+    const r = await addEntries(db, { filterSetId: setId, marketSelectionIds: [a.home.id, a.over.id, a.under.id, old.home.id, a.over.id], maxOdds: 1.25 });
+    // a.under ima kvotu 1.30 > 1.25
+    expect(r).toEqual({ added: 1, duplicate: 1, started: 1, invalid: 1 });
+    expect(await listEntries(db, setId)).toHaveLength(2);
   });
 
   it("istovremeno dodavanje istog tipa ne pravi duplikat", async () => {

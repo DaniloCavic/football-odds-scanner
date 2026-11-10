@@ -35,7 +35,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await expect(count(page)).toHaveText("0");
 
   // 1) dugme +
-  const firstAdd = page.getByRole("button", { name: /^Dodaj / }).first();
+  const firstAdd = page.getByRole("button", { name: /^Dodaj (?!sve)/ }).first();
   await firstAdd.click();
   await expect(count(page)).toHaveText("1");
   await expect(page.getByLabel("Već u filteru").first()).toBeVisible();
@@ -82,7 +82,21 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await page.getByRole("button", { name: "Očisti filter" }).click();
   await expect(count(page)).toHaveText("0");
 
-  // 7) preimenovanje i brisanje filtera uz potvrdu
+  // 7) dodaj sve – uz potvrdu, preskače ono što je već u filteru
+  await page.getByRole("button", { name: /^Ukloni / }).count();
+  await page.getByRole("button", { name: /^Dodaj (?!sve)/ }).first().click();
+  await expect(count(page)).toHaveText("1");
+  await page.getByRole("button", { name: "2+", exact: true }).click();
+  const bulk = page.getByRole("button", { name: /Dodaj sve u filter/ });
+  const n = Number((await bulk.textContent())!.match(/\((\d+)\)/)![1]);
+  expect(n).toBeGreaterThan(0);
+  page.once("dialog", (d) => d.accept());
+  await bulk.click();
+  await expect(page.getByRole("status").filter({ hasText: "Dodato" })).toContainText(`Dodato ${n} tipova`);
+  await expect(bulk).toHaveText("Dodaj sve u filter (0)");
+  await page.getByRole("button", { name: "2+", exact: true }).click();
+
+  // 8) preimenovanje i brisanje filtera uz potvrdu
   await page.getByRole("button", { name: "Preimenuj" }).click();
   await page.getByLabel("Novi naziv").fill("E2E preimenovan");
   await page.getByRole("button", { name: "Sačuvaj" }).click();
@@ -98,7 +112,7 @@ test("telefon: dodavanje dugmetom + i nema horizontalnog skrola", async ({ page,
   await page.goto("/filter");
   await page.getByRole("button", { name: "+ Novi filter" }).click();
   await page.getByRole("button", { name: "Napravi" }).click();
-  await page.getByRole("button", { name: /^Dodaj / }).first().click();
+  await page.getByRole("button", { name: /^Dodaj (?!sve)/ }).first().click();
   await expect(count(page)).toHaveText("1");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

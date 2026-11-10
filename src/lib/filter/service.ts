@@ -130,6 +130,29 @@ export async function addEntry(db: PrismaClient, input: { filterSetId: string; m
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
+export const BULK_MAX = 500;
+
+/** Dodaje više tipova odjednom. Tipove koji ne mogu (duplikat, počela, kvota) preskače i prijavljuje. */
+export async function addEntries(db: PrismaClient, input: { filterSetId: string; marketSelectionIds: string[]; maxOdds: number; now?: Date }) {
+  const ids = [...new Set(input.marketSelectionIds)];
+  if (ids.length === 0) throw new FilterError("Nema tipova za dodavanje.");
+  if (ids.length > BULK_MAX) throw new FilterError(`Najviše ${BULK_MAX} tipova odjednom.`);
+  const result = { added: 0, duplicate: 0, started: 0, invalid: 0 };
+  for (const id of ids) {
+    try {
+      await addEntry(db, { filterSetId: input.filterSetId, marketSelectionId: id, maxOdds: input.maxOdds, now: input.now });
+      result.added += 1;
+    } catch (e) {
+      if (!(e instanceof FilterError)) throw e;
+      if (e.status === 404 && /Filter/.test(e.message)) throw e;
+      if (e.status === 409) result.duplicate += 1;
+      else if (/počela/.test(e.message)) result.started += 1;
+      else result.invalid += 1;
+    }
+  }
+  return result;
+}
+
 export async function removeEntry(db: Db, filterSetId: string, entryId: string) {
   await getActiveSet(db, filterSetId);
   const res = await db.filterSetSelection.updateMany({ where: { id: entryId, filterSetId, removedAt: null }, data: { removedAt: new Date() } });
