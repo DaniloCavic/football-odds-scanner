@@ -79,7 +79,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await page.getByRole("button", { name: /^Ukloni / }).first().click();
   await expect(count(page)).toHaveText("1");
   page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Očisti filter" }).click();
+  await page.getByRole("button", { name: /^Očisti filter/ }).click();
   await expect(count(page)).toHaveText("0");
 
   // 7) dodaj sve – uz potvrdu, preskače ono što je već u filteru

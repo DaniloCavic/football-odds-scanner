@@ -331,6 +331,14 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                 <div><dt className="text-xs text-muted">Planirani ulog</dt><dd className="font-semibold tabular-nums">{rsd(plannedStake)}</dd></div>
               </dl>
 
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted">{entries.length} tipova u filteru</p>
+                <button type="button" onClick={clearAll} disabled={entries.length === 0}
+                  className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-bg hover:bg-accent-strong disabled:opacity-40">
+                  Očisti filter ({entries.length})
+                </button>
+              </div>
+
               <DropZone active={!!dragging}>
                 {entries.length === 0 ? (
                   <p className="py-10 text-center text-sm text-muted">Prevucite tip ovde<br /><span className="text-xs">ili kliknite + pored tipa</span></p>
@@ -353,11 +361,6 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                 )}
               </DropZone>
 
-              {entries.length > 0 && (
-                <div className="mt-3 flex justify-end">
-                  <button type="button" onClick={clearAll} className="text-sm text-muted hover:text-lost">Očisti filter</button>
-                </div>
-              )}
               <p className="mt-3 text-xs text-muted">Svaki tip je zasebna simulirana opklada od {rsd(activeSet.stakePerSelection)}, bez dublova i kombinacija. Kvota i ulog se zaključavaju pri dodavanju. Obračun stiže u fazi 4.</p>
             </>
           )}
