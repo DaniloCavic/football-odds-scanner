@@ -292,9 +292,23 @@ export async function compareBookmakers(apiKey: string, fixtureId: string, fetch
     startTime: fx.startTime,
     bookmakers: ODDSPAPI_BOOKMAKERS.map((b) => {
       const odds = extractOdds(fx, marketsCache!.map, b.slug);
+      // Sva tržišta za golove (pun meč) sa svim ishodima – da se vidi gde je npr. "2+"
+      const goals: { marketId: string; name: string; bookmakerMarketId?: string; outcomes: { id: string; price: number | null; active: boolean | null; bookmakerOutcomeId?: string }[] }[] = [];
+      for (const [mid, m] of Object.entries(fx.bookmakerOdds?.[b.slug]?.markets ?? {})) {
+        const name = marketsCache!.names.get(mid) ?? "?";
+        if (!/totals|goal|over|under/i.test(name) || /half|team|corner|card|first goal/i.test(name)) continue;
+        goals.push({
+          marketId: mid, name, bookmakerMarketId: (m as { bookmakerMarketId?: string }).bookmakerMarketId,
+          outcomes: Object.entries(m.outcomes ?? {}).map(([oid, o]) => {
+            const p = o.players?.["0"] as { price?: number; active?: boolean; bookmakerOutcomeId?: string } | undefined;
+            return { id: oid, price: p?.price ?? null, active: p?.active ?? null, bookmakerOutcomeId: p?.bookmakerOutcomeId };
+          }),
+        });
+      }
       return {
         slug: b.slug,
         name: b.name,
+        goals,
         present: !!fx.bookmakerOdds?.[b.slug],
         odds: Object.fromEntries(Object.entries(odds).map(([k, v]) => [k, v!.price])) as Record<string, number>,
       };

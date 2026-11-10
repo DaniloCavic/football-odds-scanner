@@ -414,7 +414,8 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
 
 type CompareResult = {
   fixtureId: string; match: string; competition: string; startTime: string;
-  bookmakers: { slug: string; name: string; present: boolean; odds: Record<string, number> }[];
+  bookmakers: { slug: string; name: string; present: boolean; odds: Record<string, number>;
+    goals?: { marketId: string; name: string; bookmakerMarketId?: string; outcomes: { id: string; price: number | null; active: boolean | null; bookmakerOutcomeId?: string }[] }[] }[];
 };
 
 function CompareBox() {
@@ -460,6 +461,18 @@ function CompareBox() {
                     </tbody>
                   </table>
                 </div>
+                {r.bookmakers.filter((b) => b.goals?.length).map((b) => (
+                  <details key={b.slug} className="mt-2 text-xs text-muted">
+                    <summary className="cursor-pointer">{b.name}: sva tržišta golova (pun meč)</summary>
+                    <ul className="mt-1 space-y-0.5">
+                      {b.goals!.map((g) => (
+                        <li key={g.marketId}>
+                          <span className="text-text">{g.marketId}</span> {g.name}{g.bookmakerMarketId ? ` (šifra kladionice ${g.bookmakerMarketId})` : ""}: {g.outcomes.map((o) => `ishod ${o.id} = ${o.price ?? "—"}${o.active === false ? " (neaktivan)" : ""}`).join(", ")}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ))}
               </div>
             ))}
           </div>
