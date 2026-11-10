@@ -4,9 +4,15 @@ import { IconRobot } from "@/components/icons";
 import { getSettings } from "@/lib/settings-repo";
 import { formatDateTime, formatOdds, formatRsd } from "@/lib/format";
 import { recentScans } from "@/lib/robot/scans";
+import { prisma } from "@/lib/db";
 
 export default async function DashboardPage() {
-  const [settings, [last]] = await Promise.all([getSettings(), recentScans(1)]);
+  const [settings, [last], active, planned] = await Promise.all([
+    getSettings(),
+    recentScans(1),
+    prisma.trackedSelection.count({ where: { status: { in: ["PENDING", "LIVE"] }, filterEntries: { some: { removedAt: null, filterSet: { status: { not: "DELETED" } } } } } }),
+    prisma.filterSetSelection.aggregate({ where: { removedAt: null, settlementStatus: { in: ["PENDING", "LIVE"] }, filterSet: { status: { not: "DELETED" } } }, _sum: { stake: true } }),
+  ]);
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Pregled sistema, poslednjeg skeniranja i tipova.">
@@ -16,7 +22,7 @@ export default async function DashboardPage() {
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Aktivne selekcije" value="0" hint="Na čekanju i uživo" tone="live" />
+        <StatCard label="Aktivne selekcije" value={String(active)} hint={`Na čekanju i uživo · planirani ulog ${formatRsd(planned._sum.stake?.toNumber() ?? 0)}`} tone="live" />
         <StatCard label="Završeni tipovi" value="0" hint="Prošlo / palo: 0 / 0" />
         <StatCard label="Prolaznost" value="—" hint="WON / (WON + LOST)" tone="won" />
         <StatCard label="Neto profit / gubitak" value={formatRsd(0)} hint={`Simulacija, ${formatRsd(settings.stakePerSelection)} po tipu`} />

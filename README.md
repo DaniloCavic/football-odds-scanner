@@ -10,8 +10,8 @@ rezultata i statistiku prolaznosti sa simulacijom profita/gubitka (1.000 RSD po 
 | Faza | Sadržaj | Status |
 |---|---|---|
 | 1 | Osnova, baza, prijava, navigacija, dashboard, dark UI | ✅ odobreno |
-| 2 | Robot – izvor kvota, ručni scan, ≤ 1.30, samo fudbal | ✅ gotovo – čeka test |
-| 3 | Filter – drag & drop, trajno čuvanje, filter setovi | ⏳ |
+| 2 | Robot – izvor kvota, ručni scan, ≤ 1.30, samo fudbal | ✅ odobreno |
+| 3 | Filter – drag & drop, trajno čuvanje, filter setovi | ✅ gotovo – čeka test |
 | 4 | Result Tracker – rezultati, obračun, statusi | ⏳ |
 | 5 | Statistika, profit po filteru, istorija | ⏳ |
 | 6 | Završno testiranje i produkcija | ⏳ |
@@ -26,6 +26,13 @@ Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze p
 - Pravilo kvote je centralno, u `isValidOdds` (`src/lib/odds.ts`): mora biti > 1.00 i ≤ 1.30. Virtuelni fudbal, e-sport i simulacije izbacuje `src/lib/robot/football.ts`.
 - Svako skeniranje čuva nove zapise kvota sa vremenom i izvorom, a stare nikada ne prepisuje.
 - Bez ključa radi samo **DEMO** izvor (izmišljene utakmice, jasno označene).
+
+## Filter (faza 3)
+- Imenovani filteri (FilterSet) sa ulogom po tipu (podrazumevano 1.000 RSD iz Podešavanja).
+- Tip se dodaje prevlačenjem ili dugmetom +. U bazi se čuva odmah, sa nepromenljivim snimkom kvote i uloga.
+- Isti tip iste utakmice ne može dvaput u isti filter (unique + serializable transakcija). Različiti tipovi iste utakmice mogu.
+- Uklanjanje, čišćenje i brisanje su "meki": zapis ostaje za statistiku. Čišćenje i brisanje se beleže u AuditLog.
+- Utakmica koja je počela ne može da se doda. Pravilo kvote se ponovo proverava na serveru.
 
 ## Tehnologije
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL + Prisma 6 · Vitest · Playwright
@@ -46,6 +53,7 @@ npm run dev                   # http://localhost:3000
 ```bash
 npm run lint && npm run typecheck   # stil i tipovi
 npm test                            # unit testovi
+npm run test:integration            # integracioni (baza fos_itest)
 npm run build && npm run test:e2e   # e2e – koristi posebnu bazu fos_test (E2E_DATABASE_URL)
 ```
 E2E testovi brišu podatke iz test baze, zato baza mora da se zove `*_test`.

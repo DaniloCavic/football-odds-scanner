@@ -11,7 +11,7 @@ export default async function globalSetup() {
   execSync("npx prisma migrate deploy", { env, stdio: "inherit" });
 
   const prisma = new PrismaClient({ datasourceUrl: E2E_ENV.DATABASE_URL });
-  await prisma.$transaction([prisma.marketSelection.deleteMany(), prisma.robotScan.deleteMany(), prisma.match.deleteMany(), prisma.auditLog.deleteMany(), prisma.session.deleteMany(), prisma.user.deleteMany(), prisma.settings.deleteMany()]);
+  await prisma.$transaction([prisma.filterSetSelection.deleteMany(), prisma.filterSet.deleteMany(), prisma.trackedSelection.deleteMany(), prisma.marketSelection.deleteMany(), prisma.robotScan.deleteMany(), prisma.match.deleteMany(), prisma.auditLog.deleteMany(), prisma.session.deleteMany(), prisma.user.deleteMany(), prisma.settings.deleteMany()]);
   await prisma.$disconnect();
 
   execSync("npx tsx prisma/seed.ts", { env, stdio: "inherit" });

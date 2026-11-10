@@ -18,6 +18,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: PGPASSWORD=postgres createdb -h localhost -U postgres fos_itest
+      - run: npm run test:integration
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --trace off

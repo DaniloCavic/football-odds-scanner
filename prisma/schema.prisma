@@ -16,6 +16,7 @@ model User {
   sessions     Session[]
   auditLogs    AuditLog[]
   robotScans   RobotScan[]
+  filterSets   FilterSet[]
 }
 
 enum Role {
@@ -80,7 +81,7 @@ enum ScanStatus {
 }
 
 model Match {
-  id                    String            @id @default(cuid())
+  id                    String             @id @default(cuid())
   provider              String
   externalId            String
   homeTeam              String
@@ -89,12 +90,13 @@ model Match {
   country               String?
   externalCompetitionId String?
   kickoffTime           DateTime
-  sportType             String            @default("FOOTBALL")
-  matchStatus           String            @default("NOT_STARTED")
-  isDemo                Boolean           @default(false)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  sportType             String             @default("FOOTBALL")
+  matchStatus           String             @default("NOT_STARTED")
+  isDemo                Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
   selections            MarketSelection[]
+  trackedSelections     TrackedSelection[]
 
   @@unique([provider, externalId])
   @@index([kickoffTime])
@@ -102,17 +104,19 @@ model Match {
 
 /// Kvota u trenutku skeniranja. Nikada se ne prepisuje: svako skeniranje pravi nove zapise.
 model MarketSelection {
-  id            String     @id @default(cuid())
+  id            String               @id @default(cuid())
   matchId       String
-  match         Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  match         Match                @relation(fields: [matchId], references: [id], onDelete: Cascade)
   scanId        String
-  scan          RobotScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  scan          RobotScan            @relation(fields: [scanId], references: [id], onDelete: Cascade)
   marketType    MarketType
-  odds          Decimal    @db.Decimal(8, 4)
+  odds          Decimal              @db.Decimal(8, 4)
   oddsTimestamp DateTime
   source        String
-  isDemo        Boolean    @default(false)
-  createdAt     DateTime   @default(now())
+  isDemo        Boolean              @default(false)
+  createdAt     DateTime             @default(now())
+  tracked       TrackedSelection[]
+  filterEntries FilterSetSelection[]
 
   @@unique([scanId, matchId, marketType])
   @@index([matchId])
@@ -145,4 +149,81 @@ model RobotScan {
 
   @@index([startedAt])
   @@index([status])
+}
+
+enum SelectionStatus {
+  PENDING
+  LIVE
+  WON
+  LOST
+  POSTPONED
+  VOID
+  NEEDS_REVIEW
+}
+
+enum FilterSetStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+/// Tip koji se prati (jedna utakmica + jedan tip). Obračun (faza 4) je isti bez obzira u koliko je filtera.
+model TrackedSelection {
+  id                String               @id @default(cuid())
+  matchId           String
+  match             Match                @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  marketSelectionId String
+  marketSelection   MarketSelection      @relation(fields: [marketSelectionId], references: [id], onDelete: Restrict)
+  marketType        MarketType
+  selection         String
+  originalOdds      Decimal              @db.Decimal(8, 4)
+  status            SelectionStatus      @default(PENDING)
+  finalHomeScore    Int?
+  finalAwayScore    Int?
+  resultSource      String?
+  settledAt         DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  filterEntries     FilterSetSelection[]
+
+  @@unique([matchId, marketType])
+  @@index([status])
+}
+
+/// Imenovani filter (npr. "Vikend – 50 tipova") sa ulogom po tipu.
+model FilterSet {
+  id                String               @id @default(cuid())
+  userId            String?
+  user              User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name              String
+  status            FilterSetStatus      @default(ACTIVE)
+  stakePerSelection Decimal              @db.Decimal(12, 2)
+  currency          String               @default("RSD")
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  entries           FilterSetSelection[]
+
+  @@index([status, createdAt])
+}
+
+/// Tip u filteru. Kvota i ulog su nepromenljiv snimak iz trenutka dodavanja.
+model FilterSetSelection {
+  id                 String           @id @default(cuid())
+  filterSetId        String
+  filterSet          FilterSet        @relation(fields: [filterSetId], references: [id], onDelete: Cascade)
+  trackedSelectionId String
+  trackedSelection   TrackedSelection @relation(fields: [trackedSelectionId], references: [id], onDelete: Restrict)
+  marketSelectionId  String
+  marketSelection    MarketSelection  @relation(fields: [marketSelectionId], references: [id], onDelete: Restrict)
+  oddsSnapshot       Decimal          @db.Decimal(8, 4)
+  stake              Decimal          @db.Decimal(12, 2)
+  settlementStatus   SelectionStatus  @default(PENDING)
+  grossReturn        Decimal?         @db.Decimal(14, 2)
+  netProfit          Decimal?         @db.Decimal(14, 2)
+  addedAt            DateTime         @default(now())
+  /// Uklonjeno iz prikaza filtera (istorija ostaje).
+  removedAt          DateTime?
+
+  @@unique([filterSetId, trackedSelectionId])
+  @@index([filterSetId, removedAt])
 }
