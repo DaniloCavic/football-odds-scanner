@@ -11,11 +11,11 @@ export const SOCCERBET_SLUG = "soccerbet.rs";
 
 /** Srpske kladionice koje OddsPapi nudi (slug → naziv). */
 export const ODDSPAPI_BOOKMAKERS = [
-  { slug: "maxbet.rs", name: "MaxBet" },
-  { slug: "soccerbet.rs", name: "Soccerbet" },
-  { slug: "mozzartbet", name: "Mozzart" },
   { slug: "admiralbet.rs", name: "AdmiralBet" },
   { slug: "superbet.rs", name: "Superbet" },
+  { slug: "mozzartbet", name: "Mozzart" },
+  { slug: "maxbet.rs", name: "MaxBet" },
+  { slug: "soccerbet.rs", name: "Soccerbet" },
   { slug: "balkanbet.rs", name: "BalkanBet" },
 ] as const;
 export type OddsPapiBookmaker = { slug: string; name: string };

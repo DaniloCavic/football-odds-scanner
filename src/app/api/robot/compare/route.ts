@@ -19,7 +19,16 @@ export async function POST() {
   if (matches.length === 0) return Response.json({ error: "Prvo pokrenite skeniranje (Danas ili Sutra) preko OddsPapi, pa uporedite." }, { status: 400 });
   try {
     const results = [];
-    for (const m of matches) results.push(await compareBookmakers(key, m.externalId));
+    for (const m of matches) {
+      const r = await compareBookmakers(key, m.externalId);
+      // /v4/odds ne vraća uvek imena – uzimamo ih iz naše baze
+      results.push({
+        ...r,
+        match: r.match.includes("?") ? `${m.homeTeam} – ${m.awayTeam}` : r.match,
+        competition: r.competition || [m.country, m.competition].filter(Boolean).join(" · "),
+        startTime: r.startTime ?? m.kickoffTime.toISOString(),
+      });
+    }
     return Response.json({ results });
   } catch (e) {
     return Response.json({ error: e instanceof ProviderError ? e.message : "Poređenje nije uspelo." }, { status: 502 });
