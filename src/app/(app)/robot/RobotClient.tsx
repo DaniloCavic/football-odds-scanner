@@ -396,8 +396,10 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
       {d.marketMap && <p className="mt-3 break-all text-xs text-muted">Mapiranje tržišta: {JSON.stringify(d.marketMap)}</p>}
       {d.rawSamples && Object.keys(d.rawSamples).length > 0 && (
         <div className="mt-3 text-xs text-muted">
-          <p className="mb-1">Uzorak podataka za mapirana tržišta (jedna utakmica):</p>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2 text-[11px]">{JSON.stringify(d.rawSamples, null, 1)}</pre>
+          <p className="mb-1">Tržišta golova koja kladionica šalje (uzorak, jedna utakmica):</p>
+          {Object.values(d.rawSamples).every((x) => x && typeof x === "object" && "outcomes" in (x as object) && Array.isArray((x as MarketDesc).outcomes))
+            ? <MarketList markets={Object.values(d.rawSamples) as MarketDesc[]} />
+            : <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2 text-[11px]">{JSON.stringify(d.rawSamples, null, 1)}</pre>}
         </div>
       )}
       {markets && markets.length > 0 && (
@@ -412,10 +414,27 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
   );
 }
 
+type MarketDesc = { marketId: string; name: string; bookmakerMarketId?: string; outcomes: { id: string; name: string; price: number | null; active: boolean | null; bookmakerOutcomeId?: string }[] };
+
+function MarketList({ markets }: { markets: MarketDesc[] }) {
+  return (
+    <ul className="mt-1 space-y-1">
+      {markets.map((g) => (
+        <li key={g.marketId}>
+          <span className="text-text">{g.marketId}</span> {g.name}{g.bookmakerMarketId ? ` · šifra kladionice ${g.bookmakerMarketId}` : ""}:{" "}
+          {g.outcomes.length === 0 ? "nema ishoda" : g.outcomes.map((o) => (
+            <span key={o.id} className="mr-2 inline-block">„{o.name}“ ({o.id}) = <span className="text-text">{o.price ?? "—"}</span>{o.active === false ? " neaktivan" : ""}</span>
+          ))}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 type CompareResult = {
   fixtureId: string; match: string; competition: string; startTime: string;
   bookmakers: { slug: string; name: string; present: boolean; odds: Record<string, number>;
-    goals?: { marketId: string; name: string; bookmakerMarketId?: string; outcomes: { id: string; price: number | null; active: boolean | null; bookmakerOutcomeId?: string }[] }[] }[];
+    goals?: MarketDesc[] }[];
 };
 
 function CompareBox() {
@@ -464,13 +483,7 @@ function CompareBox() {
                 {r.bookmakers.filter((b) => b.goals?.length).map((b) => (
                   <details key={b.slug} className="mt-2 text-xs text-muted">
                     <summary className="cursor-pointer">{b.name}: sva tržišta golova (pun meč)</summary>
-                    <ul className="mt-1 space-y-0.5">
-                      {b.goals!.map((g) => (
-                        <li key={g.marketId}>
-                          <span className="text-text">{g.marketId}</span> {g.name}{g.bookmakerMarketId ? ` (šifra kladionice ${g.bookmakerMarketId})` : ""}: {g.outcomes.map((o) => `ishod ${o.id} = ${o.price ?? "—"}${o.active === false ? " (neaktivan)" : ""}`).join(", ")}
-                        </li>
-                      ))}
-                    </ul>
+                    <MarketList markets={b.goals!} />
                   </details>
                 ))}
               </div>

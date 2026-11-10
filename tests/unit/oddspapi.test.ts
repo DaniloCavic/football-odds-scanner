@@ -225,6 +225,26 @@ describe("OddsPapi – druga kladionica", () => {
   });
 });
 
+describe("OddsPapi – 2+ i 0–3 u svim oblicima", () => {
+  const m = (id: number, name: string, type: string, handicap: number, outcomes: string[], period = "fulltime"): OddsPapiMarket => ({
+    marketId: id, marketName: name, marketType: type, period, handicap, playerProp: false, sportId: 10,
+    outcomes: outcomes.map((n, i) => ({ outcomeId: id * 10 + i, outcomeName: n })),
+  });
+  it("prepoznaje Over 1.5 bez para Under, ishode '2+'/'0-3' i Da/Ne tržišta", () => {
+    const map = resolveOutcomeMap([
+      m(108, "Over Under Full Time", "totals", 1.5, ["Over"]),
+      m(500, "Total Goals Range", "goalrange", 0, ["0-1", "2+", "0-3", "4+"]),
+      m(501, "Over 1.5 Goals", "yesno", 0, ["Yes", "No"]),
+      m(502, "Under 3.5 Goals", "yesno", 0, ["Yes", "No"]),
+      m(503, "Over Under First Half", "totals", 1.5, ["Over", "Under"], "p1"),
+      m(504, "Home Team Over Under", "totals", 1.5, ["Over", "Under"]),
+    ]);
+    const keys = (t: keyof typeof map) => map[t]!.map((r) => `${r.marketId}/${r.outcomeId}`);
+    expect(keys("OVER_1_5")).toEqual(["108/1080", "500/5001", "501/5010"]);
+    expect(keys("UNDER_3_5")).toEqual(["500/5002", "502/5020"]);
+  });
+});
+
 describe("OddsPapi – poređenje kladionica", () => {
   it("jedan /odds zahtev za sve kladionice, MaxBet bez 2+ (samo 0–1)", async () => {
     const calls: URL[] = [];
