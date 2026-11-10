@@ -7,7 +7,7 @@ const HOUR = 3600_000;
 
 async function wipe() {
   await db.$transaction([
-    db.filterSetSelection.deleteMany(), db.filterSet.deleteMany(), db.trackedSelection.deleteMany(),
+    db.filterSetSelection.deleteMany(), db.filterSet.deleteMany(), db.trackedSelection.deleteMany(), db.resultUpdate.deleteMany(), db.jobState.deleteMany(),
     db.marketSelection.deleteMany(), db.robotScan.deleteMany(), db.match.deleteMany(), db.auditLog.deleteMany(),
   ]);
 }

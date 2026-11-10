@@ -16,12 +16,15 @@ export async function saveSettingsAction(_prev: SettingsState, formData: FormDat
     maxOdds: normalizeDecimal(formData.get("maxOdds")),
     stakePerSelection: normalizeDecimal(formData.get("stakePerSelection")),
     maxRequestsPerScan: normalizeDecimal(formData.get("maxRequestsPerScan")),
+    resultCheckMinutes: normalizeDecimal(formData.get("resultCheckMinutes")),
+    oddsPapiResultChecksPerDay: normalizeDecimal(formData.get("oddsPapiResultChecksPerDay")),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const before = await getSettings();
   const next = parsed.data;
-  if (before.maxOdds === next.maxOdds && before.stakePerSelection === next.stakePerSelection && before.maxRequestsPerScan === next.maxRequestsPerScan) return { ok: true };
+  const keys = ["maxOdds", "stakePerSelection", "maxRequestsPerScan", "resultCheckMinutes", "oddsPapiResultChecksPerDay"] as const;
+  if (keys.every((k) => before[k] === next[k])) return { ok: true };
 
   await prisma.$transaction([
     prisma.settings.update({ where: { id: 1 }, data: next }),
@@ -31,7 +34,7 @@ export async function saveSettingsAction(_prev: SettingsState, formData: FormDat
         entityType: "Settings",
         entityId: "1",
         action: "UPDATE",
-        oldValue: { maxOdds: before.maxOdds, stakePerSelection: before.stakePerSelection, maxRequestsPerScan: before.maxRequestsPerScan },
+        oldValue: Object.fromEntries(keys.map((k) => [k, before[k]])),
         newValue: next,
       },
     }),

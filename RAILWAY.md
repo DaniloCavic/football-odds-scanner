@@ -23,6 +23,9 @@ Railway pokreće aplikaciju i bazu na internetu. Kada pošaljem izmene na GitHub
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 ADMIN_EMAIL=vas@email.com
 ADMIN_PASSWORD=NekaJakaLozinka2026
+ODDSPAPI_API_KEY=vaš-oddspapi-ključ
+APIFOOTBALL_API_KEY=vaš-api-football-ključ
+PORT=8080
 ```
 
 3. Kliknite **Update Variables** (ili **Save**).

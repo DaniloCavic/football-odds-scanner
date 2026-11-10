@@ -38,14 +38,18 @@ model Session {
 
 /// Globalna podešavanja aplikacije (jedan red, id = 1).
 model Settings {
-  id                 Int      @id @default(1)
-  maxOdds            Decimal  @default(1.30) @db.Decimal(4, 2)
-  stakePerSelection  Decimal  @default(1000) @db.Decimal(12, 2)
-  currency           String   @default("RSD")
-  timezone           String   @default("Europe/Belgrade")
+  id                         Int      @id @default(1)
+  maxOdds                    Decimal  @default(1.30) @db.Decimal(4, 2)
+  stakePerSelection          Decimal  @default(1000) @db.Decimal(12, 2)
+  currency                   String   @default("RSD")
+  timezone                   String   @default("Europe/Belgrade")
   /// Zaštita kvote kod API provajdera: robot staje kada potroši ovoliko zahteva u jednom skeniranju.
-  maxRequestsPerScan Int      @default(60)
-  updatedAt          DateTime @updatedAt
+  maxRequestsPerScan         Int      @default(60)
+  /// Result Tracker: najmanji razmak (min) između dve provere istog dana kod API-Football-a
+  resultCheckMinutes         Int      @default(15)
+  /// Result Tracker: koliko OddsPapi provera rezultata dnevno (rezervni izvor)
+  oddsPapiResultChecksPerDay Int      @default(10)
+  updatedAt                  DateTime @updatedAt
 }
 
 model AuditLog {
@@ -93,6 +97,12 @@ model Match {
   sportType             String             @default("FOOTBALL")
   matchStatus           String             @default("NOT_STARTED")
   isDemo                Boolean            @default(false)
+  /// Povezana utakmica kod API-Football-a i koliko je sigurno poklapanje (HIGH/MEDIUM)
+  apiFootballId         Int?
+  resultMatchConfidence String?
+  finalHomeScore        Int?
+  finalAwayScore        Int?
+  resultUpdates         ResultUpdate[]
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   selections            MarketSelection[]
@@ -226,4 +236,26 @@ model FilterSetSelection {
 
   @@unique([filterSetId, trackedSelectionId])
   @@index([filterSetId, removedAt])
+}
+
+/// Svaki rezultat koji je izvor vratio (istorija, sa izvorom i vremenom).
+model ResultUpdate {
+  id          String   @id @default(cuid())
+  matchId     String
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  homeScore   Int?
+  awayScore   Int?
+  matchStatus String
+  source      String
+  detail      Json?
+  fetchedAt   DateTime @default(now())
+
+  @@index([matchId, fetchedAt])
+}
+
+/// Stanje pozadinskih poslova (zaključavanje, brojači kvota, poslednje provere).
+model JobState {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }

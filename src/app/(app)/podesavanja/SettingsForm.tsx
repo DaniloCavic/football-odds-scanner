@@ -5,7 +5,7 @@ import { saveSettingsAction, type SettingsState } from "./actions";
 
 const input = "w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/30";
 
-export function SettingsForm({ maxOdds, stake, maxRequests }: { maxOdds: number; stake: number; maxRequests: number }) {
+export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChecks }: { maxOdds: number; stake: number; maxRequests: number; checkMinutes: number; opChecks: number }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettingsAction, {});
   return (
     <form action={action} className="space-y-5">
@@ -24,6 +24,16 @@ export function SettingsForm({ maxOdds, stake, maxRequests }: { maxOdds: number;
           <label htmlFor="maxRequestsPerScan" className="mb-1.5 block text-sm text-muted">Limit API zahteva po skeniranju</label>
           <input id="maxRequestsPerScan" name="maxRequestsPerScan" inputMode="numeric" defaultValue={maxRequests} className={input} />
           <p className="mt-1.5 text-xs text-muted">Robot staje kad potroši ovoliko OddsPapi zahteva, da ne potroši mesečnu kvotu.</p>
+        </div>
+        <div>
+          <label htmlFor="resultCheckMinutes" className="mb-1.5 block text-sm text-muted">Provera rezultata – interval (min)</label>
+          <input id="resultCheckMinutes" name="resultCheckMinutes" inputMode="numeric" defaultValue={checkMinutes} className={input} />
+          <p className="mt-1.5 text-xs text-muted">Najmanji razmak između dva API-Football zahteva za isti dan (5–240). Besplatno: 100 zahteva/dan.</p>
+        </div>
+        <div>
+          <label htmlFor="oddsPapiResultChecksPerDay" className="mb-1.5 block text-sm text-muted">OddsPapi provere rezultata dnevno</label>
+          <input id="oddsPapiResultChecksPerDay" name="oddsPapiResultChecksPerDay" inputMode="numeric" defaultValue={opChecks} className={input} />
+          <p className="mt-1.5 text-xs text-muted">Rezervni izvor – 1 zahtev po utakmici, troši mesečnu OddsPapi kvotu.</p>
         </div>
       </div>
       {state.error && <p role="alert" className="rounded-lg bg-lost/10 px-3 py-2 text-sm text-lost">{state.error}</p>}

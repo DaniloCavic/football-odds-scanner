@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { IconGrip } from "@/components/icons";
 import type { FilterEntryDto, FilterSetDto } from "@/lib/filter/service";
+import type { EntrySummary } from "@/lib/results/queries";
+import { StatusPill, signedRsd } from "@/components/status";
 import type { ScanStatusDto, SelectionDto } from "@/lib/robot/scans";
 
 const TZ = "Europe/Belgrade";
@@ -68,10 +70,16 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
   };
 
   const refreshSets = useCallback(async () => setSets(await api<FilterSetDto[]>("/api/filter-sets")), []);
+  const [summary, setSummary] = useState<EntrySummary | null>(null);
   const refreshEntries = useCallback(async (id: string | null) => {
-    if (!id) return setEntries([]);
-    try { setEntries(await api<FilterEntryDto[]>(`/api/filter-sets/${id}/entries`)); } catch { setEntries([]); }
+    if (!id) { setEntries([]); setSummary(null); return; }
+    try {
+      const [e, s] = await Promise.all([api<FilterEntryDto[]>(`/api/filter-sets/${id}/entries`), api<EntrySummary>(`/api/filter-sets/${id}/summary`)]);
+      setEntries(e); setSummary(s);
+    } catch { setEntries([]); setSummary(null); }
   }, []);
+  // rezultati stižu u pozadini – osveži desnu kolonu na svaki minut
+  useEffect(() => { const iv = setInterval(() => refreshEntries(setId), 60_000); return () => clearInterval(iv); }, [setId, refreshEntries]);
 
   useEffect(() => { refreshEntries(setId); if (setId) store.set("fos.filter.set", setId); }, [setId, refreshEntries]);
   useEffect(() => {
@@ -325,11 +333,22 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                 </div>
               )}
 
-              <dl className="mb-4 grid grid-cols-3 gap-2 rounded-xl bg-panel-2/60 p-3 text-sm">
+              <dl className="mb-3 grid grid-cols-3 gap-2 rounded-xl bg-panel-2/60 p-3 text-sm">
                 <div><dt className="text-xs text-muted">Tipova</dt><dd className="font-semibold tabular-nums" data-testid="filter-count">{entries.length}</dd></div>
                 <div><dt className="text-xs text-muted">Ulog po tipu</dt><dd className="font-semibold tabular-nums">{rsd(activeSet.stakePerSelection)}</dd></div>
                 <div><dt className="text-xs text-muted">Planirani ulog</dt><dd className="font-semibold tabular-nums">{rsd(plannedStake)}</dd></div>
               </dl>
+              {summary && summary.won + summary.lost + summary.void > 0 && (
+                <dl className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-line p-3 text-sm sm:grid-cols-4" data-testid="filter-summary">
+                  <div><dt className="text-xs text-muted">Prošlo / palo</dt><dd className="font-semibold tabular-nums"><span className="text-won">{summary.won}</span> / <span className="text-lost">{summary.lost}</span>{summary.void ? <span className="text-xs text-muted"> · {summary.void} vraćeno</span> : null}</dd></div>
+                  <div><dt className="text-xs text-muted">Prolaznost</dt><dd className="font-semibold tabular-nums">{summary.passRate == null ? "—" : `${summary.passRate.toFixed(1)}%`}</dd></div>
+                  <div><dt className="text-xs text-muted">Uloženo / isplata</dt><dd className="text-xs font-semibold tabular-nums">{rsd(summary.settledStake)}<br />{rsd(summary.grossReturn)}</dd></div>
+                  <div><dt className="text-xs text-muted">Neto</dt><dd className={`font-bold tabular-nums ${summary.netProfit > 0 ? "text-won" : summary.netProfit < 0 ? "text-lost" : ""}`} data-testid="filter-net">{signedRsd(summary.netProfit)}</dd></div>
+                  {summary.pending + summary.live + summary.postponed + summary.review > 0 && (
+                    <p className="col-span-full text-xs text-muted">Neobračunato: {summary.pending + summary.live + summary.postponed + summary.review} tipova (na čekanju/uživo/odloženo/provera) – nisu u neto rezultatu.</p>
+                  )}
+                </dl>
+              )}
 
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted">{entries.length} tipova u filteru</p>
@@ -352,7 +371,10 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                           <p className="truncate text-xs text-muted">{fmt.format(new Date(e.kickoffTime))} · {e.competition} · {e.source} {e.isDemo && <DemoBadge />}</p>
                         </div>
                         <span className="tabular-nums text-accent" data-odds={e.odds}>{e.odds.toFixed(2)}</span>
-                        <span className="hidden rounded-full bg-pending/15 px-2 py-0.5 text-xs text-pending sm:inline">Na čekanju</span>
+                        <span className="hidden flex-col items-end gap-0.5 sm:flex">
+                          <StatusPill status={e.status} />
+                          {e.netProfit != null && <span className={`text-xs tabular-nums ${e.netProfit > 0 ? "text-won" : e.netProfit < 0 ? "text-lost" : "text-muted"}`}>{e.home != null ? `${e.home}:${e.away} · ` : ""}{signedRsd(e.netProfit)}</span>}
+                        </span>
                         <button type="button" onClick={() => remove(e)} aria-label={`Ukloni ${e.homeTeam} – ${e.awayTeam} ${e.label}`}
                           className="rounded-lg p-1.5 text-muted hover:bg-lost/10 hover:text-lost">✕</button>
                       </li>
@@ -361,7 +383,7 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                 )}
               </DropZone>
 
-              <p className="mt-3 text-xs text-muted">Svaki tip je zasebna simulirana opklada od {rsd(activeSet.stakePerSelection)}, bez dublova i kombinacija. Kvota i ulog se zaključavaju pri dodavanju. Obračun stiže u fazi 4.</p>
+              <p className="mt-3 text-xs text-muted">Svaki tip je zasebna simulirana opklada od {rsd(activeSet.stakePerSelection)}, bez dublova i kombinacija. Kvota i ulog se zaključavaju pri dodavanju. Rezultati se obračunavaju automatski posle utakmice.</p>
             </>
           )}
         </Card>

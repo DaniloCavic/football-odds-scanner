@@ -11,8 +11,8 @@ rezultata i statistiku prolaznosti sa simulacijom profita/gubitka (1.000 RSD po 
 |---|---|---|
 | 1 | Osnova, baza, prijava, navigacija, dashboard, dark UI | ✅ odobreno |
 | 2 | Robot – izvor kvota, ručni scan, ≤ 1.30, samo fudbal | ✅ odobreno |
-| 3 | Filter – drag & drop, trajno čuvanje, filter setovi | ✅ gotovo – čeka test |
-| 4 | Result Tracker – rezultati, obračun, statusi | ⏳ |
+| 3 | Filter – drag & drop, trajno čuvanje, filter setovi | ✅ odobreno |
+| 4 | Result Tracker – rezultati, obračun, statusi | ✅ gotovo – čeka test |
 | 5 | Statistika, profit po filteru, istorija | ⏳ |
 | 6 | Završno testiranje i produkcija | ⏳ |
 
@@ -33,6 +33,22 @@ Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze p
 - Isti tip iste utakmice ne može dvaput u isti filter (unique + serializable transakcija). Različiti tipovi iste utakmice mogu.
 - Uklanjanje, čišćenje i brisanje su "meki": zapis ostaje za statistiku. Čišćenje i brisanje se beleže u AuditLog.
 - Utakmica koja je počela ne može da se doda. Pravilo kvote se ponovo proverava na serveru.
+
+## Result Tracker (faza 4)
+- Radi u samom serveru (`src/instrumentation.ts`), na svakih 5 minuta, i kad je browser zatvoren. Robot za kvote ostaje isključivo ručni.
+- **Primarni izvor: API-Football** (`APIFOOTBALL_API_KEY`). Jedan zahtev `/fixtures?date=` pokriva sve utakmice jednog dana, uz keš od `resultCheckMinutes` (podrazumevano 15 min) i limit od 90 zahteva dnevno. Besplatan paket vidi samo juče, danas i sutra.
+- **Rezervni izvor: OddsPapi** `/v4/settlements` (ista šifra utakmice). Koristi se samo kad API-Football ne prepozna utakmicu sigurno ili je nema. Ima dnevni limit u Podešavanjima.
+- **Prepoznavanje utakmice:** oba tima (normalizovana imena), vreme ±3h i vrsta ekipe (ženska/rezervna/mlađa, i iz imena takmičenja). Sigurno poklapanje je HIGH. Nesigurno (MEDIUM) traži potvrdu drugog izvora, a nejasno ide u NEEDS_REVIEW.
+- **Obračun:** važi rezultat posle 90 min + nadoknade (`score.fulltime`). WON = ulog × kvota, LOST = −ulog, VOID = vraćen ulog. Obračun je idempotentan (prelaz samo iz otvorenih statusa, uz zaključavanje posla u bazi).
+- **Statusi:**
+  - PST → POSTPONED
+  - CANC → VOID
+  - ABD/AWD → NEEDS_REVIEW
+  - izvori se ne slažu → NEEDS_REVIEW
+  - nema rezultata 36h → NEEDS_REVIEW
+- **Ručna ispravka** (samo ADMIN) traži obavezno obrazloženje i ide u AuditLog.
+- **DEMO utakmice** dobijaju izmišljen rezultat, označen kao „DEMO“.
+- `TRACKER_ENABLED=false` gasi automatsko pokretanje, a `TRACKER_INTERVAL_MS` menja interval.
 
 ## Tehnologije
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL + Prisma 6 · Vitest · Playwright

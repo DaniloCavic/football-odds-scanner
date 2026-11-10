@@ -9,6 +9,8 @@ export async function getSettings() {
     currency: s.currency,
     timezone: s.timezone,
     maxRequestsPerScan: s.maxRequestsPerScan,
+    resultCheckMinutes: s.resultCheckMinutes,
+    oddsPapiResultChecksPerDay: s.oddsPapiResultChecksPerDay,
     updatedAt: s.updatedAt,
   };
 }

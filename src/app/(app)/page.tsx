@@ -5,13 +5,15 @@ import { getSettings } from "@/lib/settings-repo";
 import { formatDateTime, formatOdds, formatRsd } from "@/lib/format";
 import { recentScans } from "@/lib/robot/scans";
 import { prisma } from "@/lib/db";
+import { activeEntriesWhere, entrySummary } from "@/lib/results/queries";
 
 export default async function DashboardPage() {
-  const [settings, [last], active, planned] = await Promise.all([
+  const [settings, [last], active, planned, sum] = await Promise.all([
     getSettings(),
     recentScans(1),
     prisma.trackedSelection.count({ where: { status: { in: ["PENDING", "LIVE"] }, filterEntries: { some: { removedAt: null, filterSet: { status: { not: "DELETED" } } } } } }),
     prisma.filterSetSelection.aggregate({ where: { removedAt: null, settlementStatus: { in: ["PENDING", "LIVE"] }, filterSet: { status: { not: "DELETED" } } }, _sum: { stake: true } }),
+    entrySummary(activeEntriesWhere),
   ]);
   return (
     <>
@@ -23,9 +25,9 @@ export default async function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Aktivne selekcije" value={String(active)} hint={`Na čekanju i uživo · planirani ulog ${formatRsd(planned._sum.stake?.toNumber() ?? 0)}`} tone="live" />
-        <StatCard label="Završeni tipovi" value="0" hint="Prošlo / palo: 0 / 0" />
-        <StatCard label="Prolaznost" value="—" hint="WON / (WON + LOST)" tone="won" />
-        <StatCard label="Neto profit / gubitak" value={formatRsd(0)} hint={`Simulacija, ${formatRsd(settings.stakePerSelection)} po tipu`} />
+        <StatCard label="Završeni tipovi" value={String(sum.won + sum.lost + sum.void)} hint={`Prošlo / palo: ${sum.won} / ${sum.lost}${sum.void ? ` · vraćeno ${sum.void}` : ""}`} />
+        <StatCard label="Prolaznost" value={sum.passRate == null ? "—" : `${sum.passRate.toFixed(1)}%`} hint="WON / (WON + LOST)" tone="won" />
+        <StatCard label="Neto profit / gubitak" value={(sum.netProfit > 0 ? "+" : "") + formatRsd(sum.netProfit)} hint={`Uloženo ${formatRsd(sum.settledStake)} · ${formatRsd(settings.stakePerSelection)} po tipu`} tone={sum.netProfit > 0 ? "won" : sum.netProfit < 0 ? "lost" : "default"} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
