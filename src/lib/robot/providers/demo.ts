@@ -36,7 +36,7 @@ export function demoFixtures(from: Date, to: Date): ProviderFixture[] {
       const virtual = i % 9 === 0;
       const pick = () => PRICES[Math.floor(r() * PRICES.length)];
       const odds: Partial<Record<MarketTypeCode, { price: number; changedAt: Date }>> = {};
-      (["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).forEach((m) => {
+      (["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).forEach((m) => {
         if (r() < 0.85) odds[m] = { price: pick(), changedAt: new Date() };
       });
       out.push({

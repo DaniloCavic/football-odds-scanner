@@ -1,7 +1,9 @@
 import { ABSOLUTE_MAX_ODDS } from "./settings";
 
-export const MARKET_TYPES = ["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"] as const;
-export type MarketTypeCode = (typeof MARKET_TYPES)[number];
+/** Tipovi koje robot traži: 1, 2, 2+, 0–3. (X se ne prati – odluka korisnika.) */
+export const MARKET_TYPES = ["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"] as const;
+/** Svi tipovi koji mogu postojati u bazi (DRAW ostaje samo zbog starih zapisa). */
+export type MarketTypeCode = (typeof MARKET_TYPES)[number] | "DRAW";
 
 export const MARKET_LABELS: Record<MarketTypeCode, string> = {
   HOME: "1",

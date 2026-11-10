@@ -41,7 +41,7 @@ export default async function DashboardPage() {
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between gap-4"><dt className="text-muted">Maksimalna kvota</dt><dd className="font-medium tabular-nums">{formatOdds(settings.maxOdds)}</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-muted">Ulog po tipu</dt><dd className="font-medium tabular-nums">{formatRsd(settings.stakePerSelection)}</dd></div>
-            <div className="flex justify-between gap-4"><dt className="text-muted">Tipovi</dt><dd className="font-medium">1, X, 2, 2+, 0–3</dd></div>
+            <div className="flex justify-between gap-4"><dt className="text-muted">Tipovi</dt><dd className="font-medium">1, 2, 2+, 0–3</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-muted">Sport</dt><dd className="font-medium">Samo pravi fudbal</dd></div>
             <div className="flex justify-between gap-4"><dt className="text-muted">Vremenska zona</dt><dd className="font-medium">{settings.timezone}</dd></div>
           </dl>

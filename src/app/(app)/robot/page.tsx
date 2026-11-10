@@ -12,7 +12,7 @@ export default async function RobotPage() {
   const providers = availableProviders();
   return (
     <>
-      <PageHeader title="Robot" subtitle={`Ručno skeniranje ponude: samo pravi fudbal, tipovi 1, X, 2, 2+, 0–3, kvote do ${settings.maxOdds.toFixed(2)}.`} />
+      <PageHeader title="Robot" subtitle={`Ručno skeniranje ponude: samo pravi fudbal, tipovi 1, 2, 2+, 0–3, kvote do ${settings.maxOdds.toFixed(2)}.`} />
       <RobotClient
         providers={providers}
         initialScans={scans}

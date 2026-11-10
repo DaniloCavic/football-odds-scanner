@@ -17,7 +17,7 @@ const PERIODS = [
 ] as const;
 type PeriodKey = (typeof PERIODS)[number][0];
 
-const TYPES = ["1", "X", "2", "2+", "0–3"] as const;
+const TYPES = ["1", "2", "2+", "0–3"] as const;
 const STATUS_LABEL: Record<ScanStatusDto["status"], [string, string]> = {
   RUNNING: ["Radi", "bg-live/15 text-live"],
   COMPLETED: ["Završeno", "bg-won/15 text-won"],
@@ -450,12 +450,12 @@ function CompareBox() {
                 <p className="mb-2 font-medium">{r.match}</p>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[480px] text-left text-sm">
-                    <thead className="text-muted"><tr><th className="py-1 font-medium">Kladionica</th>{["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <th key={t} className="font-medium">{TYPE_LABEL[t]}</th>)}</tr></thead>
+                    <thead className="text-muted"><tr><th className="py-1 font-medium">Kladionica</th>{["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <th key={t} className="font-medium">{TYPE_LABEL[t]}</th>)}</tr></thead>
                     <tbody>
                       {r.bookmakers.map((b) => (
                         <tr key={b.slug} className="border-t border-line/50">
                           <td className="py-1.5">{b.name}{!b.present && <span className="ml-1 text-xs text-muted">(nema utakmicu)</span>}</td>
-                          {["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <td key={t} className="tabular-nums">{b.odds[t]?.toFixed(2) ?? <span className="text-muted">—</span>}</td>)}
+                          {["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <td key={t} className="tabular-nums">{b.odds[t]?.toFixed(2) ?? <span className="text-muted">—</span>}</td>)}
                         </tr>
                       ))}
                     </tbody>

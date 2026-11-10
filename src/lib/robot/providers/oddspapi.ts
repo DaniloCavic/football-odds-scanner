@@ -75,7 +75,6 @@ export function resolveOutcomeMap(markets: OddsPapiMarket[]): OutcomeMap {
   };
   for (const m of ft.filter((x) => x.marketType === "1x2" && x.outcomes.length === 3 && !EXCLUDED_TOTALS.test(x.marketName))) {
     add("HOME", m, /^1$/);
-    add("DRAW", m, /^x$/i);
     add("AWAY", m, /^2$/);
   }
   const totals = (line: number) => ft.filter((m) => m.marketType === "totals" && Math.abs(m.handicap - line) < 1e-9
@@ -227,7 +226,7 @@ export function createOddsPapiProvider(
         for (const id of f.rawMarketIds ?? []) seenMarkets.set(id, (seenMarkets.get(id) ?? 0) + 1);
         return f;
       };
-      const missing = (["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).filter((t) => !map[t]);
+      const missing = (["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).filter((t) => !map[t]);
       if (missing.length) await ctx.warn(`OddsPapi nema prepoznato tržište za: ${missing.join(", ")}. Ti tipovi se preskaču.`);
       await ctx.diagnostic?.({ marketMap: Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v!.map((r) => `${r.marketId}/${r.outcomeId}`)])) });
 

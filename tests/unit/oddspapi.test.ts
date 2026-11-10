@@ -47,7 +47,6 @@ describe("OddsPapi – mapiranje tržišta", () => {
   it("prepoznaje 1/X/2, više od 1.5 i manje od 3.5 (pun meč)", () => {
     expect(resolveOutcomeMap(MARKETS)).toEqual({
       HOME: [{ marketId: "101", outcomeId: "101" }],
-      DRAW: [{ marketId: "101", outcomeId: "102" }],
       AWAY: [{ marketId: "101", outcomeId: "103" }],
       OVER_1_5: [{ marketId: "1010", outcomeId: "1010" }],
       UNDER_3_5: [{ marketId: "1014", outcomeId: "1015" }],
