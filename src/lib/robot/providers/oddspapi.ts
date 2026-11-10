@@ -272,6 +272,36 @@ export function createOddsPapiProvider(
   };
 }
 
+/** Kvote više kladionica za jednu utakmicu – 1 zahtev (/v4/odds). */
+export async function compareBookmakers(apiKey: string, fixtureId: string, fetchImpl: Fetch = fetch, client = new OddsPapiClient(apiKey, fetchImpl)) {
+  if (!marketsCache || Date.now() - marketsCache.at > 24 * 3600_000) {
+    const markets = await client.get<OddsPapiMarket[]>("/markets", { language: "en" });
+    marketsCache = {
+      at: Date.now(),
+      map: resolveOutcomeMap(markets),
+      names: new Map(markets.filter((m) => m.sportId === FOOTBALL_SPORT_ID).map((m) => [String(m.marketId), `${m.marketName} [${m.marketType}, ${m.period}, ${m.handicap}]`])),
+    };
+  }
+  const fx = await client.get<OddsPapiFixture>("/odds", {
+    fixtureId, bookmakers: ODDSPAPI_BOOKMAKERS.map((b) => b.slug).join(","), oddsFormat: "decimal", language: "en",
+  });
+  return {
+    fixtureId,
+    match: `${fx.participant1Name ?? "?"} – ${fx.participant2Name ?? "?"}`,
+    competition: [fx.categoryName, fx.tournamentName].filter(Boolean).join(" · "),
+    startTime: fx.startTime,
+    bookmakers: ODDSPAPI_BOOKMAKERS.map((b) => {
+      const odds = extractOdds(fx, marketsCache!.map, b.slug);
+      return {
+        slug: b.slug,
+        name: b.name,
+        present: !!fx.bookmakerOdds?.[b.slug],
+        odds: Object.fromEntries(Object.entries(odds).map(([k, v]) => [k, v!.price])) as Record<string, number>,
+      };
+    }),
+  };
+}
+
 export type OddsPapiAccount = {
   subscriptions?: { is_active?: boolean; request_limit?: number | null; request_count?: number; bookmakers?: Record<string, unknown>; sport_ids?: number[]; valid_until?: string | null }[];
   current_subscription_id?: string;

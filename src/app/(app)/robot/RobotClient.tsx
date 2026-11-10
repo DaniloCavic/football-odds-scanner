@@ -194,7 +194,10 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
             </div>
           </div>
 
-          <SourceBox source={source} maxRequests={maxRequests} />
+          <div className="space-y-3">
+            <SourceBox source={source} maxRequests={maxRequests} />
+            {source?.configured && source.ok && <CompareBox />}
+          </div>
         </div>
 
         {error && <p role="alert" className="mt-5 rounded-lg bg-lost/10 px-3 py-2 text-sm text-lost">{error}</p>}
@@ -406,5 +409,62 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
         </div>
       )}
     </details>
+  );
+}
+
+type CompareResult = {
+  fixtureId: string; match: string; competition: string; startTime: string;
+  bookmakers: { slug: string; name: string; present: boolean; odds: Record<string, number> }[];
+};
+
+function CompareBox() {
+  const [data, setData] = useState<CompareResult[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  async function run() {
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch("/api/robot/compare", { method: "POST" });
+      const j = await r.json();
+      if (!r.ok) setErr(j.error ?? "Greška."); else { setData(j.results); setOpen(true); }
+    } finally { setBusy(false); }
+  }
+  return (
+    <div className="rounded-xl border border-line bg-panel-2/50 p-4 text-sm">
+      <h3 className="mb-1 font-semibold">Uporedi kladionice</h3>
+      <p className="mb-3 text-xs text-muted">Kvote svih 6 kladionica na 3 predstojeće utakmice iz skeniranja. Troši 3 zahteva.</p>
+      <button type="button" onClick={run} disabled={busy} className="rounded-lg border border-accent/50 px-3 py-1.5 text-accent hover:bg-accent/10 disabled:opacity-50">
+        {busy ? "Upoređujem…" : "Uporedi"}
+      </button>
+      {err && <p className="mt-2 text-xs text-lost">{err}</p>}
+      {data && open && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setOpen(false)}>
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-auto rounded-2xl border border-line bg-panel p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between"><h3 className="font-semibold">Poređenje kladionica</h3>
+              <button type="button" onClick={() => setOpen(false)} className="text-muted hover:text-text">Zatvori</button></div>
+            {data.map((r) => (
+              <div key={r.fixtureId} className="mb-5">
+                <p className="text-xs text-muted">{r.competition} · {fmt.format(new Date(r.startTime))}</p>
+                <p className="mb-2 font-medium">{r.match}</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] text-left text-sm">
+                    <thead className="text-muted"><tr><th className="py-1 font-medium">Kladionica</th>{["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <th key={t} className="font-medium">{TYPE_LABEL[t]}</th>)}</tr></thead>
+                    <tbody>
+                      {r.bookmakers.map((b) => (
+                        <tr key={b.slug} className="border-t border-line/50">
+                          <td className="py-1.5">{b.name}{!b.present && <span className="ml-1 text-xs text-muted">(nema utakmicu)</span>}</td>
+                          {["HOME", "DRAW", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <td key={t} className="tabular-nums">{b.odds[t]?.toFixed(2) ?? <span className="text-muted">—</span>}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

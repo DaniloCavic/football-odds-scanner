@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  createOddsPapiProvider, extractOdds, OddsPapiClient, resolveOutcomeMap, splitRange,
+  compareBookmakers, createOddsPapiProvider, extractOdds, OddsPapiClient, resolveOutcomeMap, splitRange,
   type OddsPapiFixture, type OddsPapiMarket,
 } from "@/lib/robot/providers/oddspapi";
 import { ProviderError, RequestLimitReached, type ProviderFixture, type ScanContext } from "@/lib/robot/types";
@@ -223,5 +223,30 @@ describe("OddsPapi – druga kladionica", () => {
     expect(calls.find((u) => u.pathname === "/v4/odds-by-tournaments")!.searchParams.get("bookmaker")).toBe("maxbet.rs");
     expect(out[0].odds.OVER_1_5?.price).toBe(1.2);
     expect(out[0].odds.UNDER_3_5?.price).toBe(1.28);
+  });
+});
+
+describe("OddsPapi – poređenje kladionica", () => {
+  it("jedan /odds zahtev za sve kladionice, MaxBet bez 2+ (samo 0–1)", async () => {
+    const calls: URL[] = [];
+    const fn = (async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      calls.push(url);
+      if (url.pathname === "/v4/markets") return new Response(JSON.stringify(MARKETS));
+      const f = fixture("c1", 1);
+      f.bookmakerOdds = {
+        "maxbet.rs": { markets: { "101": { outcomes: { "101": price(1.2) } }, "1010": { outcomes: { "1011": price(3.7) } } } },
+        "mozzartbet": { markets: { "1010": { outcomes: { "1010": price(1.22) } } } },
+      };
+      return new Response(JSON.stringify(f));
+    }) as unknown as typeof fetch;
+    const r = await compareBookmakers("k", "c1", fn, new OddsPapiClient("k", fn, 0, noSleep));
+    const odds = calls.filter((u) => u.pathname === "/v4/odds");
+    expect(odds).toHaveLength(1);
+    expect(odds[0].searchParams.get("bookmakers")).toContain("maxbet.rs");
+    const maxbet = r.bookmakers.find((b) => b.slug === "maxbet.rs")!;
+    expect(maxbet.odds).toEqual({ HOME: 1.2 });
+    expect(r.bookmakers.find((b) => b.slug === "mozzartbet")!.odds.OVER_1_5).toBe(1.22);
+    expect(r.bookmakers.find((b) => b.slug === "soccerbet.rs")!.present).toBe(false);
   });
 });
