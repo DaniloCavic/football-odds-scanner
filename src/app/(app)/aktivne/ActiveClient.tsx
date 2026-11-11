@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
 import { StatusPill, STATUS_LABELS, rsd, signedRsd } from "@/components/status";
 import type { TabKey, TrackedDetail, TrackedRow } from "@/lib/results/queries";
-import type { TrackerReport } from "@/lib/results/tracker";
+import type { TrackerLogEntry, TrackerReport } from "@/lib/results/tracker";
 
 const TABS: [TabKey, string][] = [
   ["all", "Sve"], ["pending", "Na čekanju"], ["live", "Uživo"], ["won", "Prošlo"], ["lost", "Palo"], ["postponed", "Odloženo"], ["review", "Potrebna provera"],
@@ -17,8 +17,8 @@ function DemoBadge() {
   return <span className="rounded bg-live/20 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-live">DEMO</span>;
 }
 
-export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasApiFootball, similarNames = [] }: {
-  initialRows: TrackedRow[]; initialCounts: Record<TabKey, number>; report: TrackerReport | null; isAdmin: boolean; hasApiFootball: boolean; similarNames?: string[];
+export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasApiFootball, similarNames = [], log = [] }: {
+  initialRows: TrackedRow[]; initialCounts: Record<TabKey, number>; report: TrackerReport | null; isAdmin: boolean; hasApiFootball: boolean; similarNames?: string[]; log?: TrackerLogEntry[];
 }) {
   const [tab, setTab] = useState<TabKey>("all");
   const [rows, setRows] = useState(initialRows);
@@ -76,6 +76,29 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
             {" "}Slične promenljive na serveru: {similarNames.length ? <b>{similarNames.join(", ")}</b> : "nema nijedne"}.
           </p>
         )}
+        {lastReport?.sources && (
+          <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2" data-testid="sources">
+            <div className="rounded-lg bg-panel-2/60 px-3 py-2">
+              <dt className="font-medium">API-Football (primarni)</dt>
+              <dd className="text-muted">
+                {!lastReport.sources.apiFootball.configured ? "nije podešen" : <>danas {lastReport.sources.apiFootball.usedToday}/{lastReport.sources.apiFootball.cap} zahteva</>}
+                {lastReport.sources.apiFootball.blockedUntil && <span className="block text-lost">Pauziran do {fmt.format(new Date(lastReport.sources.apiFootball.blockedUntil))}: {lastReport.sources.apiFootball.lastError}</span>}
+              </dd>
+            </div>
+            <div className="rounded-lg bg-panel-2/60 px-3 py-2">
+              <dt className="font-medium">OddsPapi (rezervni)</dt>
+              <dd className="text-muted">{!lastReport.sources.oddsPapi.configured ? "nije podešen" : <>danas {lastReport.sources.oddsPapi.usedToday}/{lastReport.sources.oddsPapi.budget} provera (limit u Podešavanjima)</>}</dd>
+            </div>
+          </dl>
+        )}
+        {log.length > 0 && (
+          <details className="mt-3 text-xs">
+            <summary className="cursor-pointer text-muted">Poslednje greške izvora ({log.length})</summary>
+            <ul className="mt-2 space-y-1">
+              {log.slice(0, 15).map((l, i) => <li key={i} className="rounded bg-panel-2/60 px-3 py-1.5"><span className="text-muted">{fmt.format(new Date(l.at))} · {l.source}:</span> {l.message}</li>)}
+            </ul>
+          </details>
+        )}
         {msg && <p role="status" className="mt-3 rounded-lg bg-panel-2 px-3 py-2 text-xs text-muted">{msg}</p>}
       </Card>
 
@@ -105,7 +128,11 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
                     <td className="px-3 py-2.5 font-semibold">{r.label}</td>
                     <td className="px-3 py-2.5 tabular-nums">{r.odds.toFixed(2)}</td>
                     <td className="px-3 py-2.5 tabular-nums">{r.home != null && r.away != null ? `${r.home}:${r.away}` : "—"}</td>
-                    <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
+                    <td className="px-3 py-2.5">
+                      {r.status === "LIVE" && Date.now() - new Date(r.kickoffTime).getTime() > 110 * 60_000
+                        ? <span data-status="LIVE" className="inline-flex whitespace-nowrap rounded-full bg-pending/15 px-2.5 py-0.5 text-xs font-medium text-pending">Čeka rezultat</span>
+                        : <StatusPill status={r.status} />}
+                    </td>
                     <td className="px-3 py-2.5 text-xs text-muted">{r.resultSource ?? r.oddsSource}</td>
                   </tr>
                 ))}

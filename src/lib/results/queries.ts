@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { MARKET_LABELS, type MarketTypeCode } from "@/lib/odds";
 import { getState } from "./job-state";
-import type { TrackerReport } from "./tracker";
+import type { TrackerLogEntry, TrackerReport } from "./tracker";
 
 /** Tipovi koji su u bar jednom (neobrisanom) filteru. */
 const inActiveFilter: Prisma.TrackedSelectionWhereInput = {
@@ -124,4 +124,8 @@ export const activeEntriesWhere: Prisma.FilterSetSelectionWhereInput = { removed
 
 export async function lastTrackerReport() {
   return getState<TrackerReport | null>(prisma, "tracker:last", null);
+}
+
+export async function trackerLog() {
+  return getState<TrackerLogEntry[]>(prisma, "tracker:log", []);
 }

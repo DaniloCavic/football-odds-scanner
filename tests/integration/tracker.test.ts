@@ -118,7 +118,7 @@ describe("Result Tracker", () => {
     const day = [fx({ kickoff: new Date(KICK.getTime() + 60 * MIN) })];
     await runTracker(deps({ at: 130, day, oddsPapi: null }));
     expect(await status(ids.HOME)).toBe("PENDING"); // čeka potvrdu
-    const op = vi.fn(async () => ({ HOME: "WON" as const, OVER_1_5: "WON" as const, UNDER_3_5: "WON" as const }));
+    const op = vi.fn(async () => ({ result: { HOME: "WON" as const, OVER_1_5: "WON" as const, UNDER_3_5: "WON" as const }, rawMarketIds: ["101"] }));
     await runTracker(deps({ at: 140, day, oddsPapi: op, resultCheckMinutes: 0 }));
     expect(op).toHaveBeenCalledTimes(1);
     expect(await status(ids.HOME)).toBe("WON");
@@ -128,7 +128,7 @@ describe("Result Tracker", () => {
   it("izvori se ne slažu → NEEDS_REVIEW", async () => {
     const { ids } = await setup();
     const day = [fx({ kickoff: new Date(KICK.getTime() + 60 * MIN) })];
-    const op = vi.fn(async () => ({ HOME: "LOST" as const, OVER_1_5: "WON" as const, UNDER_3_5: "WON" as const }));
+    const op = vi.fn(async () => ({ result: { HOME: "LOST" as const, OVER_1_5: "WON" as const, UNDER_3_5: "WON" as const }, rawMarketIds: ["101"] }));
     await runTracker(deps({ at: 130, day, oddsPapi: op }));
     expect(await status(ids.HOME)).toBe("NEEDS_REVIEW");
     expect(await status(ids.OVER_1_5)).toBe("NEEDS_REVIEW");
@@ -136,7 +136,7 @@ describe("Result Tracker", () => {
 
   it("nema utakmice u API-Football-u → OddsPapi posle 150 min (tačan ID)", async () => {
     const { ids } = await setup({ home: "Neki Tim", away: "Drugi Tim" });
-    const op = vi.fn(async () => ({ HOME: "LOST" as const, OVER_1_5: "WON" as const, UNDER_3_5: "LOST" as const }));
+    const op = vi.fn(async () => ({ result: { HOME: "LOST" as const, OVER_1_5: "WON" as const, UNDER_3_5: "LOST" as const }, rawMarketIds: ["101"] }));
     await runTracker(deps({ at: 120, oddsPapi: op }));
     expect(op).not.toHaveBeenCalled();
     await runTracker(deps({ at: 160, oddsPapi: op, resultCheckMinutes: 0 }));
@@ -147,7 +147,7 @@ describe("Result Tracker", () => {
 
   it("poštuje dnevni limit OddsPapi provera", async () => {
     await setup({ home: "Neki Tim", away: "Drugi Tim" });
-    const op = vi.fn(async () => ({}));
+    const op = vi.fn(async () => ({ result: {}, rawMarketIds: [] }));
     await runTracker(deps({ at: 160, oddsPapi: op, oddsPapiChecksPerDay: 0 }));
     expect(op).not.toHaveBeenCalled();
   });
@@ -183,6 +183,30 @@ describe("Result Tracker", () => {
     const log = await db.auditLog.findFirstOrThrow({ where: { action: "MANUAL_OVERRIDE" } });
     expect(log.reason).toBe("Gol poništen naknadno");
     expect(log.oldValue).toMatchObject({ status: "WON" });
+  });
+
+  it("greška API-Football-a (suspendovan nalog): ne pokušava ponovo svakih 5 min, prelazi na OddsPapi", async () => {
+    const { ids } = await setup();
+    const af = vi.fn(async () => { throw new Error("API-Football: Your account is suspended"); });
+    const op = vi.fn(async () => ({ result: { HOME: "WON" as const, OVER_1_5: "WON" as const, UNDER_3_5: "WON" as const }, rawMarketIds: ["101"] }));
+    const r1 = await runTracker(deps({ at: 120, apiFootball: af, oddsPapi: op }));
+    expect(r1.sources?.apiFootball.blockedUntil).not.toBeNull();
+    await runTracker(deps({ at: 125, apiFootball: af, oddsPapi: op, resultCheckMinutes: 0 }));
+    await runTracker(deps({ at: 160, apiFootball: af, oddsPapi: op, resultCheckMinutes: 0 }));
+    expect(af).toHaveBeenCalledTimes(1);
+    expect(await status(ids.HOME)).toBe("WON");
+    expect((await db.trackedSelection.findUniqueOrThrow({ where: { id: ids.HOME } })).resultSource).toBe("OddsPapi");
+    const log = await db.jobState.findUniqueOrThrow({ where: { key: "tracker:log" } });
+    expect(JSON.stringify(log.value)).toContain("suspended");
+  });
+
+  it("OddsPapi bez podataka za tip: upisuje šta nedostaje", async () => {
+    await setup({ home: "Neki Tim", away: "Drugi Tim" });
+    const op = vi.fn(async () => ({ result: { HOME: "WON" as const }, rawMarketIds: ["101", "104"] }));
+    await runTracker(deps({ at: 160, oddsPapi: op }));
+    const u = await db.resultUpdate.findFirstOrThrow({ where: { source: "OddsPapi" } });
+    expect(u.matchStatus).toBe("PARTIAL");
+    expect(u.detail).toMatchObject({ missing: ["OVER_1_5", "UNDER_3_5"], marketsInResponse: ["101", "104"] });
   });
 
   it("dve istovremene provere ne obračunavaju dvaput", async () => {

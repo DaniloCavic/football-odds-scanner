@@ -11,12 +11,14 @@ type Settlements = { markets?: Record<string, { outcomes?: Record<string, { play
 
 let mapCache: { at: number; map: OutcomeMap } | null = null;
 
-export async function fetchOddsPapiSettlement(client: OddsPapiClient, fixtureId: string): Promise<OpSettlement> {
+export type OpResponse = { result: OpSettlement; rawMarketIds: string[] };
+
+export async function fetchOddsPapiSettlement(client: OddsPapiClient, fixtureId: string): Promise<OpResponse> {
   if (!mapCache || Date.now() - mapCache.at > 24 * 3600_000) {
     mapCache = { at: Date.now(), map: resolveOutcomeMap(await client.get<OddsPapiMarket[]>("/markets", { language: "en" })) };
   }
   const data = await client.get<Settlements>("/settlements", { fixtureId });
-  return parseSettlement(data, mapCache.map);
+  return { result: parseSettlement(data, mapCache.map), rawMarketIds: Object.keys(data.markets ?? {}).slice(0, 40) };
 }
 
 export function parseSettlement(data: Settlements, map: OutcomeMap): OpSettlement {

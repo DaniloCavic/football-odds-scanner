@@ -4,7 +4,7 @@ import { addDays, zonedYmd, ymdToString } from "@/lib/time";
 import { applyDecision } from "./apply";
 import type { AfFixture } from "./apifootball";
 import { findFixture } from "./matching";
-import type { OpSettlement } from "./oddspapi-results";
+import type { OpResponse, OpSettlement } from "./oddspapi-results";
 import { outcomeFor, type TrackStatus } from "./settle-math";
 import { dailyCount, getState, incDaily, setState, tryLock, unlock } from "./job-state";
 
@@ -22,7 +22,7 @@ export type TrackerDeps = {
   /** null = API-Football nije podešen */
   apiFootball: ((date: string) => Promise<AfFixture[]>) | null;
   /** null = OddsPapi nije podešen */
-  oddsPapi: ((fixtureId: string) => Promise<OpSettlement>) | null;
+  oddsPapi: ((fixtureId: string) => Promise<OpResponse>) | null;
   resultCheckMinutes: number;
   oddsPapiChecksPerDay: number;
 };
@@ -38,7 +38,19 @@ export type TrackerReport = {
   oddsPapiCalls: number;
   errors: string[];
   skipped?: string;
+  /** Stanje izvora (za prikaz). */
+  sources?: {
+    apiFootball: { configured: boolean; usedToday: number; cap: number; blockedUntil: string | null; lastError: string | null };
+    oddsPapi: { configured: boolean; usedToday: number; budget: number };
+  };
 };
+
+export type TrackerLogEntry = { at: string; source: string; message: string };
+
+/** Posle greške API-Football-a ne pokušavamo odmah ponovo (suspendovan nalog / paket → 6h, ostalo → 30 min). */
+function afBackoffMs(message: string) {
+  return /suspend|plan|access|key|token|subscription/i.test(message) ? 6 * 3600_000 : 30 * 60_000;
+}
 
 type OpenTracked = { id: string; marketType: string; status: string };
 type MatchRow = {
@@ -59,6 +71,11 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
   const report: TrackerReport = { at: now.toISOString(), matches: 0, settled: 0, live: 0, postponed: 0, needsReview: 0, apiFootballCalls: 0, oddsPapiCalls: 0, errors: [] };
 
   if (!(await tryLock(db, "tracker", 4 * MIN, now))) return { ...report, skipped: "Druga provera je u toku." };
+  const log: TrackerLogEntry[] = [];
+  const logError = (source: string, message: string) => {
+    report.errors.push(`${source}: ${message}`);
+    log.push({ at: now.toISOString(), source, message });
+  };
   try {
     const rows = await db.trackedSelection.findMany({
       where: { status: { in: ["PENDING", "LIVE", "POSTPONED"] } },
@@ -108,11 +125,13 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
       await incDaily(db, "oddspapi-results", now);
       report.oddsPapiCalls++;
       try {
-        const s = await deps.oddsPapi(m.externalId);
-        await recordUpdate(m, "OddsPapi", Object.keys(s).length ? "SETTLED" : "NO_DATA", null, null, s);
-        return s;
+        const r = await deps.oddsPapi(m.externalId);
+        const missing = m.tracked.filter((t) => !r.result[t.marketType as MarketTypeCode]).map((t) => t.marketType);
+        await recordUpdate(m, "OddsPapi", missing.length === 0 ? "SETTLED" : r.rawMarketIds.length ? "PARTIAL" : "NO_DATA", null, null,
+          { result: r.result, missing, marketsInResponse: r.rawMarketIds });
+        return r.result;
       } catch (e) {
-        report.errors.push(`OddsPapi: ${(e as Error).message}`);
+        logError("OddsPapi", `${m.homeTeam} – ${m.awayTeam}: ${(e as Error).message}`);
         return null;
       }
     };
@@ -122,6 +141,10 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
     const today = zonedYmd(now);
     const window = new Set([-1, 0, 1].map((n) => ymdToString(addDays(today, n))));
     const dayCache = new Map<string, AfFixture[] | null>();
+    const afBlocked = async () => {
+      const e = await getState<{ until: string } | null>(db, "af:error", null);
+      return !!e && new Date(e.until) > now;
+    };
     const getDay = async (date: string): Promise<AfFixture[] | null> => {
       if (dayCache.has(date)) return dayCache.get(date)!;
       let result: AfFixture[] | null = null;
@@ -130,14 +153,17 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
         const cached = await getState<{ at: string; fixtures: (Omit<AfFixture, "kickoff"> & { kickoff: string })[] } | null>(db, key, null);
         const fresh = cached && now.getTime() - new Date(cached.at).getTime() < deps.resultCheckMinutes * MIN;
         if (fresh) result = cached!.fixtures.map((f) => ({ ...f, kickoff: new Date(f.kickoff) }));
-        else if ((await dailyCount(db, "apifootball", now)) < AF_DAILY_CAP) {
+        else if (!(await afBlocked()) && (await dailyCount(db, "apifootball", now)) < AF_DAILY_CAP) {
           try {
             await incDaily(db, "apifootball", now);
             report.apiFootballCalls++;
             result = await deps.apiFootball(date);
             await setState(db, key, { at: now.toISOString(), fixtures: result.map((f) => ({ ...f, kickoff: f.kickoff.toISOString() })) });
+            await setState(db, "af:error", null);
           } catch (e) {
-            report.errors.push(`API-Football ${date}: ${(e as Error).message}`);
+            const message = (e as Error).message;
+            logError("API-Football", `${date}: ${message}`);
+            await setState(db, "af:error", { at: now.toISOString(), message, until: new Date(now.getTime() + afBackoffMs(message)).toISOString() });
             result = cached ? cached.fixtures.map((f) => ({ ...f, kickoff: new Date(f.kickoff) })) : null;
           }
         } else if (cached) result = cached.fixtures.map((f) => ({ ...f, kickoff: new Date(f.kickoff) }));
@@ -228,6 +254,18 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
     }
     return report;
   } finally {
+    const afErr = await getState<{ until: string; message: string } | null>(db, "af:error", null).catch(() => null);
+    report.sources = {
+      apiFootball: {
+        configured: !!deps.apiFootball, usedToday: await dailyCount(db, "apifootball", now).catch(() => 0), cap: AF_DAILY_CAP,
+        blockedUntil: afErr && new Date(afErr.until) > now ? afErr.until : null, lastError: afErr?.message ?? null,
+      },
+      oddsPapi: { configured: !!deps.oddsPapi, usedToday: await dailyCount(db, "oddspapi-results", now).catch(() => 0), budget: deps.oddsPapiChecksPerDay },
+    };
+    if (log.length) {
+      const prev = await getState<TrackerLogEntry[]>(db, "tracker:log", []).catch(() => []);
+      await setState(db, "tracker:log", [...log, ...prev].slice(0, 30)).catch(() => {});
+    }
     await setState(db, "tracker:last", report).catch(() => {});
     await unlock(db, "tracker");
   }
