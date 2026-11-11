@@ -39,10 +39,10 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
   useEffect(() => { load(tab); }, [tab, load]);
   useEffect(() => { const iv = setInterval(() => load(tab), 60_000); return () => clearInterval(iv); }, [tab, load]);
 
-  async function runNow() {
+  async function runNow(url = "/api/tracker/run") {
     setRunning(true); setMsg(null);
     try {
-      const r = await fetch("/api/tracker/run", { method: "POST" });
+      const r = await fetch(url, { method: "POST" });
       const j = await r.json();
       if (!r.ok) setMsg(j.error ?? "Greška.");
       else {
@@ -65,7 +65,7 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
             </p>
           </div>
           {isAdmin && (
-            <button type="button" onClick={runNow} disabled={running} className="rounded-xl bg-accent px-4 py-2 font-semibold text-bg hover:bg-accent-strong disabled:opacity-50">
+            <button type="button" onClick={() => runNow()} disabled={running} className="rounded-xl bg-accent px-4 py-2 font-semibold text-bg hover:bg-accent-strong disabled:opacity-50">
               {running ? "Proveravam…" : "Proveri rezultate sada"}
             </button>
           )}
@@ -82,7 +82,12 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
               <dt className="font-medium">API-Football (primarni)</dt>
               <dd className="text-muted">
                 {!lastReport.sources.apiFootball.configured ? "nije podešen" : <>danas {lastReport.sources.apiFootball.usedToday}/{lastReport.sources.apiFootball.cap} zahteva</>}
-                {lastReport.sources.apiFootball.blockedUntil && <span className="block text-lost">Pauziran do {fmt.format(new Date(lastReport.sources.apiFootball.blockedUntil))}: {lastReport.sources.apiFootball.lastError}</span>}
+                {lastReport.sources.apiFootball.blockedUntil && (
+                  <span className="block text-lost">
+                    Pauziran do {fmt.format(new Date(lastReport.sources.apiFootball.blockedUntil))}: {lastReport.sources.apiFootball.lastError}
+                    {isAdmin && <button type="button" onClick={() => runNow("/api/tracker/retry-af")} disabled={running} className="ml-2 rounded-lg border border-lost/50 px-2 py-0.5 text-lost hover:bg-lost/10 disabled:opacity-50">Pokušaj ponovo odmah</button>}
+                  </span>
+                )}
               </dd>
             </div>
             <div className="rounded-lg bg-panel-2/60 px-3 py-2">
