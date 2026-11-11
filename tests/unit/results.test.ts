@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { amountsFor, outcomeFor } from "@/lib/results/settle-math";
 import { findFixture, teamSimilarity } from "@/lib/results/matching";
+import { parseScores } from "@/lib/results/oddspapi-results";
 
 describe("obračun tipova (90 min)", () => {
   it("1 i 2", () => {
@@ -82,5 +83,15 @@ describe("prepoznavanje utakmice", () => {
   it("dve slične utakmice → nejasno", () => {
     const r = findFixture(t("Nacional", "Peñarol"), [c(1, "Nacional", "Penarol"), c(2, "Nacional", "Peñarol")]);
     expect(r.status).toBe("ambiguous");
+  });
+});
+
+describe("OddsPapi /scores", () => {
+  it("uzima period fulltime (90 min)", () => {
+    expect(parseScores({ scores: { periods: { result: { participant1Score: 3, participant2Score: 2 }, p1: { participant1Score: 0, participant2Score: 0 }, fulltime: { participant1Score: 2, participant2Score: 2 } } } })).toEqual({ home: 2, away: 2 });
+  });
+  it("bez fulltime → null (ne nagađamo)", () => {
+    expect(parseScores({ scores: { periods: { result: { participant1Score: 1, participant2Score: 0 } } } })).toBeNull();
+    expect(parseScores({})).toBeNull();
   });
 });

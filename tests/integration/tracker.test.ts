@@ -145,6 +145,25 @@ describe("Result Tracker", () => {
     expect(await status(ids.UNDER_3_5)).toBe("LOST");
   });
 
+  it("OddsPapi /scores: rezultat posle 90 min → obračun i prikaz rezultata", async () => {
+    const { ids, match } = await setup({ home: "Neki Tim", away: "Drugi Tim" });
+    const op = vi.fn(async () => ({ result: {}, rawMarketIds: ["result", "p1", "fulltime"], score: { home: 2, away: 0 } }));
+    await runTracker(deps({ at: 160, oddsPapi: op }));
+    expect(await status(ids.HOME)).toBe("WON");
+    expect(await status(ids.OVER_1_5)).toBe("WON");
+    expect(await status(ids.UNDER_3_5)).toBe("WON");
+    const m = await db.match.findUniqueOrThrow({ where: { id: match.id } });
+    expect([m.finalHomeScore, m.finalAwayScore]).toEqual([2, 0]);
+  });
+
+  it("OddsPapi se ne troši na tipove koji nisu u aktivnom filteru", async () => {
+    const { set } = await setup({ home: "Neki Tim", away: "Drugi Tim" });
+    await db.filterSetSelection.updateMany({ where: { filterSetId: set }, data: { removedAt: new Date() } });
+    const op = vi.fn(async () => ({ result: {}, rawMarketIds: [], score: { home: 1, away: 0 } }));
+    await runTracker(deps({ at: 160, oddsPapi: op }));
+    expect(op).not.toHaveBeenCalled();
+  });
+
   it("poštuje dnevni limit OddsPapi provera", async () => {
     await setup({ home: "Neki Tim", away: "Drugi Tim" });
     const op = vi.fn(async () => ({ result: {}, rawMarketIds: [] }));

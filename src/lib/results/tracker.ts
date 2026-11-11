@@ -47,6 +47,8 @@ export type TrackerReport = {
   };
 };
 
+type OpResult = { result: OpSettlement; score: { home: number; away: number } | null };
+
 export type TrackerLogEntry = { at: string; source: string; message: string };
 
 /** Posle greške API-Football-a ne pokušavamo odmah ponovo (suspendovan nalog / paket → 6h, ostalo → 30 min). */
@@ -59,6 +61,8 @@ type MatchRow = {
   id: string; provider: string; externalId: string; homeTeam: string; awayTeam: string; competition: string;
   kickoffTime: Date; isDemo: boolean; apiFootballId: number | null; resultMatchConfidence: string | null;
   tracked: OpenTracked[];
+  /** Bar jedan tip je u aktivnom filteru (samo takve proveravamo preko skupog OddsPapi-ja). */
+  inActiveFilter: boolean;
 };
 
 function demoScore(externalId: string) {
@@ -81,12 +85,13 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
   try {
     const rows = await db.trackedSelection.findMany({
       where: { status: { in: ["PENDING", "LIVE", "POSTPONED"] } },
-      include: { match: true },
+      include: { match: true, filterEntries: { where: { removedAt: null, filterSet: { status: { not: "DELETED" } } }, select: { id: true } } },
     });
     const byMatch = new Map<string, MatchRow>();
     for (const r of rows) {
-      const m = byMatch.get(r.matchId) ?? { ...r.match, tracked: [] };
+      const m = byMatch.get(r.matchId) ?? { ...r.match, tracked: [], inActiveFilter: false };
       m.tracked.push({ id: r.id, marketType: r.marketType, status: r.status });
+      if (r.filterEntries.length > 0) m.inActiveFilter = true;
       byMatch.set(r.matchId, m);
     }
     report.matches = byMatch.size;
@@ -118,8 +123,8 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
 
     // OddsPapi (rezervni) – štedljivo
     const opBudget = async () => deps.oddsPapi && (await dailyCount(db, "oddspapi-results", now)) < deps.oddsPapiChecksPerDay;
-    const askOddsPapi = async (m: MatchRow): Promise<OpSettlement | null> => {
-      if (m.provider !== "oddspapi" || !deps.oddsPapi || !(await opBudget())) return null;
+    const askOddsPapi = async (m: MatchRow): Promise<OpResult | null> => {
+      if (m.provider !== "oddspapi" || !m.inActiveFilter || !deps.oddsPapi || !(await opBudget())) return null;
       const lastKey = `op:last:${m.externalId}`;
       const last = await getState<{ at: string } | null>(db, lastKey, null);
       if (last && now.getTime() - new Date(last.at).getTime() < 60 * MIN) return null;
@@ -128,16 +133,18 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
       report.oddsPapiCalls++;
       try {
         const r = await deps.oddsPapi(m.externalId);
-        const missing = m.tracked.filter((t) => !r.result[t.marketType as MarketTypeCode]).map((t) => t.marketType);
-        await recordUpdate(m, "OddsPapi", missing.length === 0 ? "SETTLED" : r.rawMarketIds.length ? "PARTIAL" : "NO_DATA", null, null,
-          { result: r.result, missing, marketsInResponse: r.rawMarketIds });
-        return r.result;
+        const result: OpSettlement = { ...r.result };
+        if (r.score) for (const t of m.tracked) result[t.marketType as MarketTypeCode] = outcomeFor(t.marketType as MarketTypeCode, r.score.home, r.score.away);
+        const missing = m.tracked.filter((t) => !result[t.marketType as MarketTypeCode]).map((t) => t.marketType);
+        await recordUpdate(m, "OddsPapi", r.score ? "FINISHED" : missing.length === 0 ? "SETTLED" : r.rawMarketIds.length ? "PARTIAL" : "NO_DATA",
+          r.score?.home ?? null, r.score?.away ?? null, { result, missing, marketsInResponse: r.rawMarketIds });
+        return { result, score: r.score ?? null };
       } catch (e) {
         logError("OddsPapi", `${m.homeTeam} – ${m.awayTeam}: ${(e as Error).message}`);
         return null;
       }
     };
-    const opCovers = (m: MatchRow, s: OpSettlement | null) => !!s && m.tracked.every((t) => s[t.marketType as MarketTypeCode]);
+    const opCovers = (m: MatchRow, s: OpResult | null) => !!s && m.tracked.every((t) => s.result[t.marketType as MarketTypeCode]);
 
     // API-Football po danu (beogradsko vreme), samo juče/danas/sutra
     const today = zonedYmd(now);
@@ -224,7 +231,7 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
             else {
               const op = await askOddsPapi(m);
               if (opCovers(m, op)) {
-                const disagree = m.tracked.some((t) => op![t.marketType as MarketTypeCode] !== outcomeFor(t.marketType as MarketTypeCode, fx!.score90!.home, fx!.score90!.away));
+                const disagree = m.tracked.some((t) => op!.result[t.marketType as MarketTypeCode] !== outcomeFor(t.marketType as MarketTypeCode, fx!.score90!.home, fx!.score90!.away));
                 if (disagree) await decide(m, "NEEDS_REVIEW", "API-Football + OddsPapi", { reason: "Izvori se ne slažu oko ishoda.", home: fx.score90.home, away: fx.score90.away });
                 else await settleFromScore(m, fx.score90.home, fx.score90.away, "API-Football + OddsPapi");
               } else if (sinceKick > REVIEW_AFTER_H * 60) {
@@ -244,9 +251,11 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
       // 2) Rezervni izvor ako primarni nije dao odgovor
       if (!handled && sinceKick >= FALLBACK_AFTER_MIN) {
         const op = await askOddsPapi(m);
-        if (opCovers(m, op)) {
+        if (op?.score) {
+          await settleFromScore(m, op.score.home, op.score.away, "OddsPapi");
+        } else if (opCovers(m, op)) {
           const per: Partial<Record<MarketTypeCode, TrackStatus>> = {};
-          for (const t of m.tracked) per[t.marketType as MarketTypeCode] = op![t.marketType as MarketTypeCode]!;
+          for (const t of m.tracked) per[t.marketType as MarketTypeCode] = op!.result[t.marketType as MarketTypeCode]!;
           await db.match.update({ where: { id: m.id }, data: { matchStatus: "FINISHED" } });
           await decide(m, "WON", "OddsPapi", { per });
         } else if (sinceKick > REVIEW_AFTER_H * 60) {

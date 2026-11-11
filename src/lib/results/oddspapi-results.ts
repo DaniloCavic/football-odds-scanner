@@ -11,7 +11,27 @@ type Settlements = { markets?: Record<string, { outcomes?: Record<string, { play
 
 let mapCache: { at: number; map: OutcomeMap } | null = null;
 
-export type OpResponse = { result: OpSettlement; rawMarketIds: string[] };
+export type OpResponse = { result: OpSettlement; rawMarketIds: string[]; score?: { home: number; away: number } | null };
+
+type Scores = { scores?: { periods?: Record<string, { participant1Score?: number | null; participant2Score?: number | null }> } };
+
+/** Rezultat posle 90 minuta iz /v4/scores (period "fulltime"). */
+export function parseScores(data: Scores): { home: number; away: number } | null {
+  const ft = data.scores?.periods?.fulltime;
+  if (!ft || typeof ft.participant1Score !== "number" || typeof ft.participant2Score !== "number") return null;
+  return { home: ft.participant1Score, away: ft.participant2Score };
+}
+
+/**
+ * Prvo /scores (mali odgovor, daje rezultat posle 90 min). Ako tamo nema "fulltime", tek onda /settlements.
+ * Najčešće troši 1 zahtev po utakmici.
+ */
+export async function fetchOddsPapiResult(client: OddsPapiClient, fixtureId: string): Promise<OpResponse> {
+  const scores = await client.get<Scores>("/scores", { fixtureId });
+  const score = parseScores(scores);
+  if (score) return { result: {}, rawMarketIds: Object.keys(scores.scores?.periods ?? {}), score };
+  return fetchOddsPapiSettlement(client, fixtureId);
+}
 
 export async function fetchOddsPapiSettlement(client: OddsPapiClient, fixtureId: string): Promise<OpResponse> {
   if (!mapCache || Date.now() - mapCache.at > 24 * 3600_000) {
