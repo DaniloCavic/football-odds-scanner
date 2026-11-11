@@ -1,17 +1,13 @@
-import { PageHeader, PhaseNotice, StatCard } from "@/components/ui";
-import { formatRsd } from "@/lib/format";
+import { PageHeader } from "@/components/ui";
+import { prisma } from "@/lib/db";
+import { StatsClient } from "./StatsClient";
 
-export default function StatsPage() {
+export default async function StatsPage() {
+  const sets = await prisma.filterSet.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, status: true } });
   return (
     <>
-      <PageHeader title="Statistika" subtitle="Prolaznost i simulirani profit/gubitak po tipovima, kvotama i periodima." />
-      <PhaseNotice phase={5}>Grafikoni, periodi, prolaznost po tipu i opsegu kvota, profit po filteru.</PhaseNotice>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Završeno" value="0" />
-        <StatCard label="Prošlo" value="0" tone="won" />
-        <StatCard label="Palo" value="0" tone="lost" />
-        <StatCard label="Neto rezultat" value={formatRsd(0)} />
-      </div>
+      <PageHeader title="Statistika" subtitle="Prolaznost i simulirani profit po tipovima, kvotama, takmičenjima i periodima – iz obračunatih tipova u filterima." />
+      <StatsClient sets={sets.map((s) => ({ id: s.id, name: s.name, deleted: s.status === "DELETED" }))} />
     </>
   );
 }

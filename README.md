@@ -12,8 +12,8 @@ rezultata i statistiku prolaznosti sa simulacijom profita/gubitka (1.000 RSD po 
 | 1 | Osnova, baza, prijava, navigacija, dashboard, dark UI | ✅ odobreno |
 | 2 | Robot – izvor kvota, ručni scan, ≤ 1.30, samo fudbal | ✅ odobreno |
 | 3 | Filter – drag & drop, trajno čuvanje, filter setovi | ✅ odobreno |
-| 4 | Result Tracker – rezultati, obračun, statusi | ✅ gotovo – čeka test |
-| 5 | Statistika, profit po filteru, istorija | ⏳ |
+| 4 | Result Tracker – rezultati, obračun, statusi | ✅ odobreno (privremeno OddsPapi dok API-Football Pro nije uplaćen) |
+| 5 | Statistika, profit po filteru, istorija | ✅ gotovo – čeka test |
 | 6 | Završno testiranje i produkcija | ⏳ |
 
 ## Izvor kvota (faza 2)
@@ -49,6 +49,20 @@ Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze p
 - **Ručna ispravka** (samo ADMIN) traži obavezno obrazloženje i ide u AuditLog.
 - **DEMO utakmice** dobijaju izmišljen rezultat, označen kao „DEMO“.
 - `TRACKER_ENABLED=false` gasi automatsko pokretanje, a `TRACKER_INTERVAL_MS` menja interval.
+
+## Statistika (faza 5)
+- Računa se iz sačuvanih zapisa obračuna (`FilterSetSelection`), a ne iz trenutnog prikaza. Obuhvat je „Aktivni filteri“ ili „Sa uklonjenim i obrisanim“. DEMO je podrazumevano isključen.
+- Prolaznost = WON / (WON + LOST). Break-even = (WON + LOST) / Σ kvota, odnosno prolaznost potrebna da se bude na nuli. ROI = neto / uloženo.
+- Prikazi:
+  - golovi naspram konačnog ishoda
+  - po tipu
+  - po kvoti (na 0.05 i po opsezima iz specifikacije)
+  - matrica tip × kvota
+  - dnevno, nedeljno i mesečno: prošlo/palo i kumulativni neto
+  - po filteru (sa podelom po tipu)
+  - po takmičenju
+  - poslednji pali tipovi
+- Istorija skeniranja sadrži sva skeniranja (sa pronađenim tipovima) i audit log (statusi, ručne ispravke, filteri, podešavanja).
 
 ## Tehnologije
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL + Prisma 6 · Vitest · Playwright

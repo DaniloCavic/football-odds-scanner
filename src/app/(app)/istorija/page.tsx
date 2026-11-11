@@ -1,11 +1,23 @@
-import { PageHeader, Card, PhaseNotice, EmptyState } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
+import { prisma } from "@/lib/db";
+import { recentScans } from "@/lib/robot/scans";
+import { HistoryClient } from "./HistoryClient";
 
-export default function HistoryPage() {
+export default async function HistoryPage() {
+  const [scans, audit] = await Promise.all([
+    recentScans(200),
+    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 300, include: { user: { select: { email: true } } } }),
+  ]);
   return (
     <>
-      <PageHeader title="Istorija skeniranja" subtitle="Prethodna skeniranja robota i njihovi rezultati." />
-      <PhaseNotice phase={5}>Pregled svih skeniranja i audit log.</PhaseNotice>
-      <Card className="mt-6"><EmptyState title="Nema skeniranja" text="Svako ručno pokretanje robota biće zabeleženo ovde." /></Card>
+      <PageHeader title="Istorija skeniranja" subtitle="Sva pokretanja robota i dnevnik promena (audit log)." />
+      <HistoryClient
+        scans={scans}
+        audit={audit.map((a) => ({
+          id: a.id, at: a.createdAt.toISOString(), by: a.user?.email ?? "Sistem", entityType: a.entityType, entityId: a.entityId,
+          action: a.action, old: a.oldValue, new: a.newValue, reason: a.reason,
+        }))}
+      />
     </>
   );
 }

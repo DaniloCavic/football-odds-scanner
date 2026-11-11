@@ -79,3 +79,38 @@ test("ceo tok: filter → utakmica završena → obračun, profit, ručna isprav
   await expect(page.getByText("Završeni tipovi").locator("..").getByText("3", { exact: true })).toBeVisible(); // 3 tipa u aktivnom filteru
   await db.$disconnect();
 });
+
+test("statistika i istorija: brojke se slažu sa bazom", async ({ page, isMobile }) => {
+  test.skip(isMobile, "desktop tok");
+  await login(page);
+  const db = new PrismaClient({ datasourceUrl: E2E_ENV.DATABASE_URL });
+  const entries = await db.filterSetSelection.findMany({
+    where: { removedAt: null, filterSet: { status: { not: "DELETED" } }, settlementStatus: { in: ["WON", "LOST", "VOID"] } },
+  });
+  const net = Math.round(entries.reduce((a, e) => a + Number(e.netProfit), 0));
+  const won = entries.filter((e) => e.settlementStatus === "WON").length;
+  const lost = entries.filter((e) => e.settlementStatus === "LOST").length;
+  await db.$disconnect();
+  expect(won + lost).toBeGreaterThan(0);
+
+  await page.goto("/statistika");
+  await page.getByRole("button", { name: "Sve", exact: true }).click();
+  await page.getByLabel("DEMO").check();
+  await expect(page.getByTestId("kpi-net")).toBeVisible();
+  const txt = (await page.getByTestId("kpi-net").textContent())!;
+  expect(Number(txt.replace(/[^\d-]/g, ""))).toBe(net);
+  await expect(page.getByTestId("kpis")).toContainText(`${won} / ${lost}`);
+  await expect(page.getByTestId("insight")).toContainText("prolaznosti da bi se bilo na nuli");
+  for (const id of ["by-group", "by-type", "by-odds", "matrix", "by-filter"]) await expect(page.getByTestId(id)).toBeVisible();
+  await expect(page.getByTestId("by-group")).toContainText("Golovi (2+, 0–3)");
+
+  // bez DEMO podataka statistika je prazna (sve je DEMO u e2e bazi)
+  await page.getByLabel("DEMO").uncheck();
+  await expect(page.getByText("Nema podataka za izabrani period")).toBeVisible();
+
+  await page.goto("/istorija");
+  await expect(page.getByTestId("scans-table")).toContainText("Probni podaci");
+  await page.getByRole("tab", { name: /Audit log/ }).click();
+  await page.getByRole("button", { name: "Ručne ispravke" }).click();
+  await expect(page.getByTestId("audit-list")).toContainText("Utakmica poništena odlukom saveza");
+});
