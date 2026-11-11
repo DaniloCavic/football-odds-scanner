@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession } from "@/lib/auth/session";
 import { loginLimiter } from "@/lib/rate-limit";
+import { log, maskEmail } from "@/lib/log";
 
 export type LoginState = { error?: string; email?: string };
 
@@ -29,12 +30,16 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const ip = h.get("x-forwarded-for")?.split(",")[0].trim() || h.get("x-real-ip") || "local";
   const key = `${ip}|${email}`;
   if (!loginLimiter.hit(key)) {
+    log.warn("auth", "previše pokušaja prijave", { email: maskEmail(email), ip });
     return { error: "Previše pokušaja. Sačekajte 15 minuta pa probajte ponovo.", email };
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
   const ok = await verifyPassword(password, user?.passwordHash ?? (await getDummyHash()));
-  if (!user || !ok) return { error: "Pogrešan email ili lozinka.", email };
+  if (!user || !ok) {
+    log.warn("auth", "neuspešna prijava", { email: maskEmail(email), ip });
+    return { error: "Pogrešan email ili lozinka.", email };
+  }
 
   loginLimiter.reset(key);
   await createSession(user.id);

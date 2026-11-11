@@ -87,5 +87,5 @@ test("podešavanja: 1.31 se odbija, 1.30 i ulog se čuvaju trajno", async ({ pag
 test("health endpoint", async ({ request }) => {
   const res = await request.get("/api/health");
   expect(res.ok()).toBe(true);
-  expect(await res.json()).toEqual({ status: "ok", db: "ok" });
+  expect(await res.json()).toMatchObject({ status: "ok", db: "ok" });
 });

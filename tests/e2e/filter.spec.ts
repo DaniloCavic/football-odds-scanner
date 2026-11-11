@@ -59,7 +59,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   // 3) duplikat preko API-ja se odbija
   const setId = await page.getByLabel("Izabrani filter").inputValue();
   const entries = await (await page.request.get(`/api/filter-sets/${setId}/entries`)).json();
-  const dup = await page.request.post(`/api/filter-sets/${setId}/entries`, { data: { marketSelectionId: entries[0].marketSelectionId } });
+  const dup = await page.request.post(`/api/filter-sets/${setId}/entries`, { data: { marketSelectionId: entries[0].marketSelectionId }, headers: { origin: new URL(page.url()).origin } });
   expect(dup.status()).toBe(409);
 
   // 4) trajno: refresh, pa odjava/prijava

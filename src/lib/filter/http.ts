@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/session";
 import { FilterError } from "./service";
+import { log } from "@/lib/log";
 
 /** Zajednički omotač za rute: provera prijave i pretvaranje grešaka u JSON. */
 export async function handle(fn: (user: { id: string }) => Promise<Response>): Promise<Response> {
@@ -12,7 +13,7 @@ export async function handle(fn: (user: { id: string }) => Promise<Response>): P
     if (e && typeof e === "object" && "code" in e && (e as { code: string }).code === "P2034") {
       return Response.json({ error: "Istovremena izmena – pokušajte ponovo." }, { status: 409 });
     }
-    console.error("[filter]", e);
+    log.error("api", "neočekivana greška", { error: (e as Error).message });
     return Response.json({ error: "Greška na serveru." }, { status: 500 });
   }
 }

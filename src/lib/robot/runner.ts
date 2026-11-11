@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { log } from "@/lib/log";
 import { isValidOdds, MARKET_TYPES } from "@/lib/odds";
 import { isRealFootball } from "./football";
 import { getProvider } from "./providers";
@@ -112,7 +113,7 @@ export async function runScan(scanId: string): Promise<void> {
     } else {
       finalStatus = "FAILED";
       const msg = e instanceof ProviderError ? e.message : "Neočekivana greška robota.";
-      console.error(`[robot] skeniranje ${scanId} palo:`, e);
+      log.error("robot", "skeniranje palo", { scanId, error: (e as Error).message });
       await appendError(scanId, msg);
     }
   }

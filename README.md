@@ -13,8 +13,8 @@ rezultata i statistiku prolaznosti sa simulacijom profita/gubitka (1.000 RSD po 
 | 2 | Robot – izvor kvota, ručni scan, ≤ 1.30, samo fudbal | ✅ odobreno |
 | 3 | Filter – drag & drop, trajno čuvanje, filter setovi | ✅ odobreno |
 | 4 | Result Tracker – rezultati, obračun, statusi | ✅ odobreno (privremeno OddsPapi dok API-Football Pro nije uplaćen) |
-| 5 | Statistika, profit po filteru, istorija | ✅ gotovo – čeka test |
-| 6 | Završno testiranje i produkcija | ⏳ |
+| 5 | Statistika, profit po filteru, istorija | ✅ odobreno |
+| 6 | Završno testiranje i produkcija | ✅ gotovo – čeka test |
 
 ## Izvor kvota (faza 2)
 Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze preko **OddsPapi** agregatora
@@ -68,7 +68,7 @@ Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze p
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PostgreSQL + Prisma 6 · Vitest · Playwright
 
 ## Pokretanje na Railway-u
-Pogledajte **[RAILWAY.md](RAILWAY.md)**.
+Pogledajte **[RAILWAY.md](RAILWAY.md)**. Održavanje, backup i nadzor: **[PRODUKCIJA.md](PRODUKCIJA.md)**.
 
 ## Lokalno pokretanje (za programere)
 ```bash
@@ -97,6 +97,13 @@ src/lib              baza, sesije, lozinke, validacija podešavanja, formatiranj
 tests/unit           Vitest
 tests/e2e            Playwright (desktop + telefon)
 ```
+
+## Bezbednost (faza 6)
+- Sigurnosna zaglavlja: CSP, X-Frame-Options DENY, HSTS, nosniff, Referrer-Policy i Permissions-Policy.
+- CSRF zaštita: sve API izmene (POST/PATCH/DELETE) moraju imati Origin sa iste adrese. Server actions to proveravaju same, kroz Next.
+- Promena lozinke odjavljuje ostale uređaje i upisuje se u AuditLog. Dnevno održavanje briše istekle sesije i stari keš.
+- Strukturisani JSON logovi (`src/lib/log.ts`), a neuspešne prijave se beleže sa maskiranim emailom.
+- Docker kontejner ne radi kao root.
 
 ## Bezbednost
 - Lozinke se čuvaju kao bcrypt hash. Sesija je nasumičan token u httpOnly cookie-ju, a u bazi je samo njegov SHA-256.
