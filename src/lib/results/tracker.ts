@@ -15,6 +15,8 @@ const FALLBACK_AFTER_MIN = 150;
 const REVIEW_AFTER_H = 36;
 const GIVE_UP_DAYS = 3;
 const AF_DAILY_CAP = 90;
+/** Brojač uspešnih API-Football zahteva (v2: neuspeli se više ne broje). */
+const AF_COUNTER = "apifootball-ok";
 
 export type TrackerDeps = {
   db: PrismaClient;
@@ -153,11 +155,11 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
         const cached = await getState<{ at: string; fixtures: (Omit<AfFixture, "kickoff"> & { kickoff: string })[] } | null>(db, key, null);
         const fresh = cached && now.getTime() - new Date(cached.at).getTime() < deps.resultCheckMinutes * MIN;
         if (fresh) result = cached!.fixtures.map((f) => ({ ...f, kickoff: new Date(f.kickoff) }));
-        else if (!(await afBlocked()) && (await dailyCount(db, "apifootball", now)) < AF_DAILY_CAP) {
+        else if (!(await afBlocked()) && (await dailyCount(db, AF_COUNTER, now)) < AF_DAILY_CAP) {
           try {
-            await incDaily(db, "apifootball", now);
             report.apiFootballCalls++;
             result = await deps.apiFootball(date);
+            await incDaily(db, AF_COUNTER, now); // brojimo samo uspešne zahteve
             await setState(db, key, { at: now.toISOString(), fixtures: result.map((f) => ({ ...f, kickoff: f.kickoff.toISOString() })) });
             await setState(db, "af:error", null);
           } catch (e) {
@@ -257,7 +259,7 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
     const afErr = await getState<{ until: string; message: string } | null>(db, "af:error", null).catch(() => null);
     report.sources = {
       apiFootball: {
-        configured: !!deps.apiFootball, usedToday: await dailyCount(db, "apifootball", now).catch(() => 0), cap: AF_DAILY_CAP,
+        configured: !!deps.apiFootball, usedToday: await dailyCount(db, AF_COUNTER, now).catch(() => 0), cap: AF_DAILY_CAP,
         blockedUntil: afErr && new Date(afErr.until) > now ? afErr.until : null, lastError: afErr?.message ?? null,
       },
       oddsPapi: { configured: !!deps.oddsPapi, usedToday: await dailyCount(db, "oddspapi-results", now).catch(() => 0), budget: deps.oddsPapiChecksPerDay },
