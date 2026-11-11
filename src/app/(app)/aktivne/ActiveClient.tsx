@@ -17,8 +17,8 @@ function DemoBadge() {
   return <span className="rounded bg-live/20 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-live">DEMO</span>;
 }
 
-export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasApiFootball }: {
-  initialRows: TrackedRow[]; initialCounts: Record<TabKey, number>; report: TrackerReport | null; isAdmin: boolean; hasApiFootball: boolean;
+export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasApiFootball, similarNames = [] }: {
+  initialRows: TrackedRow[]; initialCounts: Record<TabKey, number>; report: TrackerReport | null; isAdmin: boolean; hasApiFootball: boolean; similarNames?: string[];
 }) {
   const [tab, setTab] = useState<TabKey>("all");
   const [rows, setRows] = useState(initialRows);
@@ -70,6 +70,12 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
             </button>
           )}
         </div>
+        {!hasApiFootball && (
+          <p role="alert" className="mt-3 rounded-lg bg-lost/10 px-3 py-2 text-xs text-lost">
+            Server ne vidi API-Football ključ. Na Railway-u (kockica aplikacije → Variables) promenljiva mora da se zove <b>APIFOOTBALL_API_KEY</b>.
+            {" "}Slične promenljive na serveru: {similarNames.length ? <b>{similarNames.join(", ")}</b> : "nema nijedne"}.
+          </p>
+        )}
         {msg && <p role="status" className="mt-3 rounded-lg bg-panel-2 px-3 py-2 text-xs text-muted">{msg}</p>}
       </Card>
 

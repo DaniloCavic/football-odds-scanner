@@ -76,4 +76,10 @@ export async function fetchDay(apiKey: string, date: string, fetchImpl: typeof f
   return (body.response ?? []).map(parseFixture);
 }
 
-export const apiFootballKey = () => process.env.APIFOOTBALL_API_KEY?.trim() || process.env.API_FOOTBALL_KEY?.trim() || null;
+const AF_KEY_NAMES = [
+  "APIFOOTBALL_API_KEY", "API_FOOTBALL_API_KEY", "APIFOOTBALL_KEY", "API_FOOTBALL_KEY", "APIFOOTBALL",
+  "API_FOOTBALL", "APISPORTS_KEY", "API_SPORTS_KEY", "X_APISPORTS_KEY", "FOOTBALL_API_KEY",
+];
+export const apiFootballKey = () => AF_KEY_NAMES.map((n) => process.env[n]?.trim()).find(Boolean) || null;
+/** Samo IMENA promenljivih koje liče na API-Football ključ (nikad vrednosti) – pomoć pri podešavanju. */
+export const apiFootballSimilarNames = () => Object.keys(process.env).filter((n) => /football|apisports|api_sports/i.test(n));
