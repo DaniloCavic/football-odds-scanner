@@ -27,6 +27,15 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
   const [lastReport, setLastReport] = useState(report);
   const [running, setRunning] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [opTest, setOpTest] = useState<unknown>(null);
+  async function testOddsPapi() {
+    if (!window.confirm("Test troši 3 OddsPapi zahteva. Nastaviti?")) return;
+    setRunning(true);
+    try {
+      const r = await fetch("/api/tracker/test-oddspapi", { method: "POST" });
+      setOpTest(await r.json());
+    } finally { setRunning(false); }
+  }
 
   const load = useCallback(async (t: TabKey) => {
     const r = await fetch(`/api/tracked?tab=${t}`, { cache: "no-store" });
@@ -103,6 +112,14 @@ export function ActiveClient({ initialRows, initialCounts, report, isAdmin, hasA
               {log.slice(0, 15).map((l, i) => <li key={i} className="rounded bg-panel-2/60 px-3 py-1.5"><span className="text-muted">{fmt.format(new Date(l.at))} · {l.source}:</span> {l.message}</li>)}
             </ul>
           </details>
+        )}
+        {isAdmin && (
+          <div className="mt-3 text-xs">
+            <button type="button" onClick={testOddsPapi} disabled={running} className="rounded-lg border border-line px-3 py-1.5 text-muted hover:text-text disabled:opacity-50">Test OddsPapi rezultata (3 zahteva)</button>
+            {opTest != null && (
+              <pre data-testid="op-test" className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-3 text-[11px] text-muted">{JSON.stringify(opTest, null, 1)}</pre>
+            )}
+          </div>
         )}
         {msg && <p role="status" className="mt-3 rounded-lg bg-panel-2 px-3 py-2 text-xs text-muted">{msg}</p>}
       </Card>
