@@ -18,12 +18,13 @@ export async function saveSettingsAction(_prev: SettingsState, formData: FormDat
     maxRequestsPerScan: normalizeDecimal(formData.get("maxRequestsPerScan")),
     resultCheckMinutes: normalizeDecimal(formData.get("resultCheckMinutes")),
     oddsPapiResultChecksPerDay: normalizeDecimal(formData.get("oddsPapiResultChecksPerDay")),
+    excludeGoalsPair: formData.get("excludeGoalsPair") === "on",
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const before = await getSettings();
   const next = parsed.data;
-  const keys = ["maxOdds", "stakePerSelection", "maxRequestsPerScan", "resultCheckMinutes", "oddsPapiResultChecksPerDay"] as const;
+  const keys = ["maxOdds", "stakePerSelection", "maxRequestsPerScan", "resultCheckMinutes", "oddsPapiResultChecksPerDay", "excludeGoalsPair"] as const;
   if (keys.every((k) => before[k] === next[k])) return { ok: true };
 
   await prisma.$transaction([

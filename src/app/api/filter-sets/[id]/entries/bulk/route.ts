@@ -11,6 +11,6 @@ export const POST = (req: Request, { params }: { params: Promise<{ id: string }>
     return Response.json({ error: "Neispravan zahtev." }, { status: 400 });
   }
   const settings = await getSettings();
-  const result = await addEntries(prisma, { filterSetId: (await params).id, marketSelectionIds, maxOdds: settings.maxOdds });
+  const result = await addEntries(prisma, { filterSetId: (await params).id, marketSelectionIds, maxOdds: settings.maxOdds, excludeGoalsPair: settings.excludeGoalsPair });
   return Response.json(result);
 });

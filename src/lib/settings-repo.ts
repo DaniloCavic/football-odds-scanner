@@ -11,6 +11,7 @@ export async function getSettings() {
     maxRequestsPerScan: s.maxRequestsPerScan,
     resultCheckMinutes: s.resultCheckMinutes,
     oddsPapiResultChecksPerDay: s.oddsPapiResultChecksPerDay,
+    excludeGoalsPair: s.excludeGoalsPair,
     updatedAt: s.updatedAt,
   };
 }

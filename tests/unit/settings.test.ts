@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeDecimal, settingsSchema } from "@/lib/settings";
 
-const parse = (maxOdds: string, stake = "1000", req = "60") => settingsSchema.safeParse({ maxOdds, stakePerSelection: stake, maxRequestsPerScan: req, resultCheckMinutes: "15", oddsPapiResultChecksPerDay: "10" });
+const parse = (maxOdds: string, stake = "1000", req = "60") => settingsSchema.safeParse({ maxOdds, stakePerSelection: stake, maxRequestsPerScan: req, resultCheckMinutes: "15", oddsPapiResultChecksPerDay: "10", excludeGoalsPair: true });
 
 describe("podešavanja – maksimalna kvota", () => {
   it("prihvata 1.30 (granica uključena)", () => expect(parse("1.30").success).toBe(true));

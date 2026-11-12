@@ -24,6 +24,7 @@ export const settingsSchema = z.object({
     .min(1, "Limit zahteva mora biti najmanje 1.")
     .max(1000, "Limit zahteva može biti najviše 1000."),
   resultCheckMinutes: z.coerce.number({ invalid_type_error: "Interval mora biti broj." }).int("Interval mora biti ceo broj.").min(5, "Interval je najmanje 5 minuta.").max(240, "Interval je najviše 240 minuta."),
+  excludeGoalsPair: z.boolean().default(true),
   oddsPapiResultChecksPerDay: z.coerce.number({ invalid_type_error: "Limit mora biti broj." }).int("Limit mora biti ceo broj.").min(0, "Limit ne može biti negativan.").max(200, "Limit je najviše 200."),
 });
 

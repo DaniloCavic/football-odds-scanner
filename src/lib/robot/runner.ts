@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { log } from "@/lib/log";
 import { isValidOdds, MARKET_TYPES } from "@/lib/odds";
 import { isRealFootball } from "./football";
+import { applyGoalsPairRule } from "./rules";
 import { getProvider } from "./providers";
 import { ProviderError, RequestLimitReached, type ScanContext } from "./types";
 
@@ -78,8 +79,10 @@ export async function runScan(scanId: string): Promise<void> {
         priceCounts[m].total += 1;
         priceCounts[m].min = priceCounts[m].min == null ? p : Math.min(priceCounts[m].min!, p);
       }
-      const valid = MARKET_TYPES.filter((m) => fx.odds[m] && isValidOdds(fx.odds[m]!.price, maxOdds));
-      for (const m of valid) priceCounts[m].valid += 1;
+      const rawValid = MARKET_TYPES.filter((m) => fx.odds[m] && isValidOdds(fx.odds[m]!.price, maxOdds));
+      for (const m of rawValid) priceCounts[m].valid += 1;
+      const { kept: valid, pairExcluded } = applyGoalsPairRule(rawValid, settings?.excludeGoalsPair ?? true);
+      if (pairExcluded) await prisma.robotScan.update({ where: { id: scanId }, data: { pairsExcluded: { increment: 1 } } });
       let created = 0;
       if (valid.length) {
         const match = await prisma.match.upsert({

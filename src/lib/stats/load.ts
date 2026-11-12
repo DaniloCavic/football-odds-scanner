@@ -16,7 +16,7 @@ export async function loadStatRows(q: StatQuery): Promise<StatRow[]> {
   const where: Prisma.FilterSetSelectionWhereInput = {
     ...(q.scope === "active" ? { removedAt: null, filterSet: { status: { not: "DELETED" } } } : {}),
     ...(q.filterSetId ? { filterSetId: q.filterSetId } : {}),
-    ...(q.includeDemo ? {} : { marketSelection: { isDemo: false } }),
+    marketSelection: { excludedReason: null, ...(q.includeDemo ? {} : { isDemo: false }) },
     trackedSelection: {
       match: {
         kickoffTime: { ...(q.from ? { gte: q.from } : {}), ...(q.to ? { lt: q.to } : {}) },

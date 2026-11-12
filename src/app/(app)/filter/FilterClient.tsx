@@ -108,10 +108,10 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
     if (!window.confirm(`Dodati ${list.length} tipova u filter „${activeSet.name}“?\nPlanirani ulog: ${rsd(total)}`)) return;
     setBulkBusy(true);
     try {
-      const r = await api<{ added: number; duplicate: number; started: number; invalid: number }>(`/api/filter-sets/${setId}/entries/bulk`, {
+      const r = await api<{ added: number; duplicate: number; started: number; invalid: number; pair?: number }>(`/api/filter-sets/${setId}/entries/bulk`, {
         method: "POST", body: JSON.stringify({ marketSelectionIds: list.map((s) => s.id) }),
       });
-      const skipped = [r.duplicate && `${r.duplicate} već u filteru`, r.started && `${r.started} počelo`, r.invalid && `${r.invalid} neispravno`].filter(Boolean).join(", ");
+      const skipped = [r.duplicate && `${r.duplicate} već u filteru`, r.started && `${r.started} počelo`, r.invalid && `${r.invalid} neispravno`, r.pair && `${r.pair} (2+ i 0–3 ista utakmica)`].filter(Boolean).join(", ");
       flash(`Dodato ${r.added} tipova${skipped ? ` (preskočeno: ${skipped})` : ""}.`);
       await Promise.all([refreshEntries(setId), refreshSets()]);
     } catch (e) { flash((e as Error).message, "err"); } finally { setBulkBusy(false); }

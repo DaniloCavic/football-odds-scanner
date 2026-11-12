@@ -231,11 +231,12 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
           <div className="h-2 overflow-hidden rounded-full bg-panel-2">
             <div className={`h-full rounded-full bg-accent transition-all ${running ? "animate-pulse" : ""}`} style={{ width: `${pct}%` }} />
           </div>
-          <dl className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
+          <dl className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4 lg:grid-cols-7">
             <Stat label="Početak" value={fmtTime.format(new Date(current.startedAt))} />
             <Stat label="Kraj" value={current.finishedAt ? fmtTime.format(new Date(current.finishedAt)) : "—"} />
             <Stat label="Pregledano utakmica" value={`${current.fixturesScanned}${current.fixturesTotal != null ? ` / ${current.fixturesTotal}` : ""}`} testId="scanned" />
             <Stat label="Izbačeno (virtuelno i sl.)" value={String(current.fixturesExcluded)} />
+            <Stat label="Izbačeno (2+ i 0–3)" value={String(current.pairsExcluded ?? 0)} testId="pairs" />
             <Stat label="Pronađeno selekcija" value={String(current.selectionsFound)} testId="found" />
             <Stat label="API zahteva" value={current.isDemo ? "0 (DEMO)" : String(current.requestsUsed)} />
           </dl>

@@ -74,8 +74,8 @@ describe("filter – trajno čuvanje i pravila", () => {
     const { home, over, under } = await seed();
     const setId = await createFilterSet(db, { name: "X", userId: null, stake: 1000 });
     const e1 = await addEntry(db, { filterSetId: setId, marketSelectionId: home.id, maxOdds: 1.3 });
-    await addEntry(db, { filterSetId: setId, marketSelectionId: over.id, maxOdds: 1.3 });
-    await addEntry(db, { filterSetId: setId, marketSelectionId: under.id, maxOdds: 1.3 });
+    await addEntry(db, { filterSetId: setId, marketSelectionId: over.id, maxOdds: 1.3, excludeGoalsPair: false });
+    await addEntry(db, { filterSetId: setId, marketSelectionId: under.id, maxOdds: 1.3, excludeGoalsPair: false });
 
     await removeEntry(db, setId, e1);
     expect(await listEntries(db, setId)).toHaveLength(2);
@@ -110,7 +110,7 @@ describe("filter – trajno čuvanje i pravila", () => {
     const old = await seed(-1);
     const setId = await createFilterSet(db, { name: "Sve", userId: null, stake: 1000 });
     await addEntry(db, { filterSetId: setId, marketSelectionId: a.home.id, maxOdds: 1.3 });
-    const r = await addEntries(db, { filterSetId: setId, marketSelectionIds: [a.home.id, a.over.id, a.under.id, old.home.id, a.over.id], maxOdds: 1.25 });
+    const r = await addEntries(db, { filterSetId: setId, marketSelectionIds: [a.home.id, a.over.id, a.under.id, old.home.id, a.over.id], maxOdds: 1.25, excludeGoalsPair: false });
     // a.under ima kvotu 1.30 > 1.25
     expect(r).toEqual({ added: 1, duplicate: 1, started: 1, invalid: 1 });
     expect(await listEntries(db, setId)).toHaveLength(2);

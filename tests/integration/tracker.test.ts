@@ -29,7 +29,7 @@ async function setup(opts: { home?: string; away?: string; kickoff?: Date; isDem
   const ids: Record<string, string> = {};
   for (const t of opts.types ?? ["HOME", "OVER_1_5", "UNDER_3_5"]) {
     const ms = await db.marketSelection.create({ data: { matchId: match.id, scanId: scan.id, marketType: t, odds: opts.odds ?? 1.25, oddsTimestamp: new Date(), source: "AdmiralBet · OddsPapi" } });
-    await addEntry(db, { filterSetId: set, marketSelectionId: ms.id, maxOdds: 1.3, now: new Date(kickoff.getTime() - 60 * MIN) });
+    await addEntry(db, { filterSetId: set, marketSelectionId: ms.id, maxOdds: 1.3, now: new Date(kickoff.getTime() - 60 * MIN), excludeGoalsPair: false });
     ids[t] = (await db.trackedSelection.findFirstOrThrow({ where: { marketSelectionId: ms.id } })).id;
   }
   return { match, set, ids };

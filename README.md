@@ -27,6 +27,15 @@ Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze p
 - Svako skeniranje čuva nove zapise kvota sa vremenom i izvorom, a stare nikada ne prepisuje.
 - Bez ključa radi samo **DEMO** izvor (izmišljene utakmice, jasno označene).
 
+## Pravilo „2+ i 0–3 zajedno“
+Ako su za istu utakmicu i 2+ i 0–3 do maks. kvote, robot ne čuva nijedan od ta dva tipa, a 1 i 2 iste utakmice ostaju. Takva utakmica je praktično igra na „2 ili 3 gola“.
+- Pravilo se uključuje i isključuje u Podešavanjima i podrazumevano je uključeno.
+- Na stara skeniranja primenjuje se pri pokretanju servera (`retroExcludeGoalsPairs`, idempotentno):
+  - takvi tipovi dobijaju `excludedReason = GOALS_PAIR`
+  - njihovi zapisi u filterima se uklanjaju iz prikaza i statistike
+  - brojke skeniranja se preračunavaju, a promena ide u audit log
+- U istom filteru se ne može dodati suprotan tip golova za utakmicu koja već ima jedan.
+
 ## Filter (faza 3)
 - Imenovani filteri (FilterSet) sa ulogom po tipu (podrazumevano 1.000 RSD iz Podešavanja).
 - Tip se dodaje prevlačenjem ili dugmetom +. U bazi se čuva odmah, sa nepromenljivim snimkom kvote i uloga.

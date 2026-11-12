@@ -105,12 +105,20 @@ export type FilterEntryDto = Awaited<ReturnType<typeof listEntries>>[number];
  * - isti tip iste utakmice ne može dva puta u isti filter (različiti tipovi iste utakmice mogu);
  * - kvota i ulog se zaključavaju u trenutku dodavanja.
  */
-export async function addEntry(db: PrismaClient, input: { filterSetId: string; marketSelectionId: string; maxOdds: number; now?: Date }) {
+export async function addEntry(db: PrismaClient, input: { filterSetId: string; marketSelectionId: string; maxOdds: number; now?: Date; excludeGoalsPair?: boolean }) {
   const now = input.now ?? new Date();
   return db.$transaction(async (tx) => {
     const set = await getActiveSet(tx, input.filterSetId);
     const ms = await tx.marketSelection.findUnique({ where: { id: input.marketSelectionId }, include: { match: true } });
     if (!ms) throw new FilterError("Tip ne postoji.", 404);
+    if (ms.excludedReason) throw new FilterError("Ovaj tip je izbačen pravilom (2+ i 0–3 za istu utakmicu).");
+    if (input.excludeGoalsPair !== false && (ms.marketType === "OVER_1_5" || ms.marketType === "UNDER_3_5")) {
+      const other = ms.marketType === "OVER_1_5" ? "UNDER_3_5" : "OVER_1_5";
+      const clash = await tx.filterSetSelection.findFirst({
+        where: { filterSetId: set.id, removedAt: null, trackedSelection: { matchId: ms.matchId, marketType: other } },
+      });
+      if (clash) throw new FilterError("Ova utakmica već ima suprotan tip golova (2+ / 0–3) u filteru – takve utakmice se ne igraju.");
+    }
     if (ms.match.kickoffTime <= now) throw new FilterError("Utakmica je već počela – tip ne može da se doda.");
     const odds = ms.odds.toNumber();
     if (!isValidOdds(odds, input.maxOdds)) throw new FilterError(`Kvota ${odds.toFixed(2)} je iznad dozvoljene ${input.maxOdds.toFixed(2)}.`);
@@ -137,20 +145,21 @@ export async function addEntry(db: PrismaClient, input: { filterSetId: string; m
 export const BULK_MAX = 500;
 
 /** Dodaje više tipova odjednom. Tipove koji ne mogu (duplikat, počela, kvota) preskače i prijavljuje. */
-export async function addEntries(db: PrismaClient, input: { filterSetId: string; marketSelectionIds: string[]; maxOdds: number; now?: Date }) {
+export async function addEntries(db: PrismaClient, input: { filterSetId: string; marketSelectionIds: string[]; maxOdds: number; now?: Date; excludeGoalsPair?: boolean }) {
   const ids = [...new Set(input.marketSelectionIds)];
   if (ids.length === 0) throw new FilterError("Nema tipova za dodavanje.");
   if (ids.length > BULK_MAX) throw new FilterError(`Najviše ${BULK_MAX} tipova odjednom.`);
-  const result = { added: 0, duplicate: 0, started: 0, invalid: 0 };
+  const result: { added: number; duplicate: number; started: number; invalid: number; pair?: number } = { added: 0, duplicate: 0, started: 0, invalid: 0 };
   for (const id of ids) {
     try {
-      await addEntry(db, { filterSetId: input.filterSetId, marketSelectionId: id, maxOdds: input.maxOdds, now: input.now });
+      await addEntry(db, { filterSetId: input.filterSetId, marketSelectionId: id, maxOdds: input.maxOdds, now: input.now, excludeGoalsPair: input.excludeGoalsPair });
       result.added += 1;
     } catch (e) {
       if (!(e instanceof FilterError)) throw e;
       if (e.status === 404 && /Filter/.test(e.message)) throw e;
       if (e.status === 409) result.duplicate += 1;
       else if (/počela/.test(e.message)) result.started += 1;
+      else if (/2\+ \/ 0–3|izbačen pravilom/.test(e.message)) result.pair = (result.pair ?? 0) + 1;
       else result.invalid += 1;
     }
   }

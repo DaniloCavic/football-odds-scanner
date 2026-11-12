@@ -12,6 +12,6 @@ export const POST = (req: Request, { params }: Ctx) => handle(async () => {
   const { marketSelectionId } = await body(req);
   if (typeof marketSelectionId !== "string") return Response.json({ error: "Neispravan zahtev." }, { status: 400 });
   const settings = await getSettings();
-  const id = await addEntry(prisma, { filterSetId: (await params).id, marketSelectionId, maxOdds: settings.maxOdds });
+  const id = await addEntry(prisma, { filterSetId: (await params).id, marketSelectionId, maxOdds: settings.maxOdds, excludeGoalsPair: settings.excludeGoalsPair });
   return Response.json({ id }, { status: 201 });
 });

@@ -22,6 +22,7 @@ export async function getScanStatus(id: string) {
     fixturesTotal: s.fixturesTotal,
     fixturesScanned: s.fixturesScanned,
     fixturesExcluded: s.fixturesExcluded,
+    pairsExcluded: s.pairsExcluded,
     selectionsFound: s.selectionsFound,
     requestsUsed: s.requestsUsed,
     errors: Array.isArray(s.errors) ? (s.errors as string[]) : [],
@@ -38,7 +39,7 @@ export type ScanStatusDto = NonNullable<Awaited<ReturnType<typeof getScanStatus>
 
 export async function getScanSelections(scanId: string) {
   const rows = await prisma.marketSelection.findMany({
-    where: { scanId },
+    where: { scanId, excludedReason: null },
     include: { match: true },
     orderBy: [{ match: { kickoffTime: "asc" } }, { marketType: "asc" }],
   });
