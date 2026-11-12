@@ -194,7 +194,10 @@ export class OddsPapiClient {
   }
 }
 
-type MarketsCache = { at: number; map: OutcomeMap; names: Map<string, string>; outcomeNames: Map<string, string> };
+type MarketsCache = { at: number; map: OutcomeMap; names: Map<string, string>; outcomeNames: Map<string, string>; combos: { id: number; name: string; outcomes: string[] }[] };
+
+/** Spojena tržišta „ishod + golovi“ u OddsPapi katalogu (npr. „1 & Over 1.5“). */
+const COMBO = /(&|\band\b|\+).*(over|under|total|goal)|(result|1x2|winner|match).*(total|over|under|goals)|(total|over|under|goals).*(result|1x2|winner)/i;
 let marketsCache: MarketsCache | null = null;
 
 function buildCache(markets: OddsPapiMarket[]): MarketsCache {
@@ -204,6 +207,11 @@ function buildCache(markets: OddsPapiMarket[]): MarketsCache {
     map: resolveOutcomeMap(markets),
     names: new Map(football.map((m) => [String(m.marketId), `${m.marketName} [${m.marketType}, ${m.period}, ${m.handicap}]`])),
     outcomeNames: new Map(football.flatMap((m) => m.outcomes.map((o) => [`${m.marketId}/${o.outcomeId}`, o.outcomeName] as [string, string]))),
+    combos: football
+      .filter((m) => !m.playerProp && (COMBO.test(`${m.marketName} ${m.marketType}`) || m.outcomes.some((o) => /(1|2|home|away).*(&|and|\+).*(over|under)/i.test(o.outcomeName))))
+      .filter((m) => !/(half|corner|booking|card|team 1|team 2)/i.test(m.marketName))
+      .slice(0, 40)
+      .map((m) => ({ id: m.marketId, name: `${m.marketName} [${m.marketType}, ${m.period}, ${m.handicap}]`, outcomes: m.outcomes.map((o) => o.outcomeName).slice(0, 8) })),
   };
 }
 
@@ -306,7 +314,12 @@ export function createOddsPapiProvider(
       // Dijagnostika: koja tržišta Soccerbet stvarno ima (najčešćih 40)
       const top = [...seenMarkets.entries()].sort((a, b) => b[1] - a[1])
         .map(([id, count]) => ({ id, count, name: names.get(id) ?? "?" }));
-      await ctx.diagnostic?.({ bookmakerMarkets: top, rawSamples: samples });
+      const comboIds = new Set(marketsCache.combos.map((c) => String(c.id)));
+      await ctx.diagnostic?.({
+        bookmakerMarkets: top, rawSamples: samples,
+        comboCatalog: marketsCache.combos.map((c) => ({ ...c, offeredByBookmaker: seenMarkets.get(String(c.id)) ?? 0 })),
+        comboOffered: [...seenMarkets.keys()].filter((id) => comboIds.has(id)).length,
+      });
     },
   };
 }

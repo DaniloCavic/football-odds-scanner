@@ -403,6 +403,18 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
             : <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2 text-[11px]">{JSON.stringify(d.rawSamples, null, 1)}</pre>}
         </div>
       )}
+      {d.comboCatalog && (
+        <div className="mt-3 text-xs text-muted" data-testid="combo-catalog">
+          <p className="mb-1">Spojena tržišta „ishod + golovi“ u OddsPapi katalogu: <b className="text-text">{d.comboCatalog.length}</b></p>
+          {d.comboCatalog.length === 0 ? <p>Nema nijednog – OddsPapi ne prenosi spojene tipove.</p> : (
+            <ul className="space-y-0.5">
+              {d.comboCatalog.map((c) => (
+                <li key={c.id}><span className="text-text">{c.id}</span> {c.name} · ishodi: {c.outcomes.join(", ")} · {scan.providerName}: {c.offeredByBookmaker ? <b className="text-won">nudi ({c.offeredByBookmaker} utakmica)</b> : "ne nudi"}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {markets && markets.length > 0 && (
         <div className="mt-3 text-xs text-muted">
           <p className="mb-1">Tržišta koja {scan.providerName} ima (najčešća):</p>

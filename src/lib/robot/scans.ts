@@ -32,6 +32,7 @@ export async function getScanStatus(id: string) {
       bookmakerMarkets?: { id: string; count: number; name: string }[];
       marketMap?: Record<string, string[]>;
       rawSamples?: Record<string, unknown>;
+      comboCatalog?: { id: number; name: string; outcomes: string[]; offeredByBookmaker: number }[];
     },
   };
 }
