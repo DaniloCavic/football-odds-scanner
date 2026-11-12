@@ -103,7 +103,7 @@ function ScanRow({ s, open, onToggle, selections }: { s: ScanStatusDto; open: bo
       {open && (
         <tr>
           <td colSpan={9} className="bg-panel-2/40 px-4 py-3 text-xs">
-            <p className="text-muted">Period: {fmt.format(new Date(s.startDate))} – {fmt.format(new Date(s.endDate))} · maks. kvota {s.maxOddsUsed.toFixed(2)}{s.pairsExcluded ? ` · izbačeno ${s.pairsExcluded} utakmica sa 2+ i 0–3` : ""}</p>
+            <p className="text-muted">Period: {fmt.format(new Date(s.startDate))} – {fmt.format(new Date(s.endDate))} · maks. kvota {s.maxOddsUsed.toFixed(2)}{s.pairsExcluded ? ` · izbačeno ${s.pairsExcluded} utakmica sa 2+ i 0–3` : ""}{s.combosCreated ? ` · spojenih tipova ${s.combosCreated}` : ""}{s.comboSkipped ? ` · preskočeno ${s.comboSkipped} (nema spojene kvote)` : ""}</p>
             {s.errors.length > 0 && <ul className="mt-2 space-y-0.5 text-lost">{s.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
             {!selections ? <p className="mt-2 text-muted">Učitavam…</p> : selections.length === 0 ? <p className="mt-2 text-muted">Nema selekcija.</p> : (
               <ul className="mt-2 grid gap-x-6 gap-y-0.5 sm:grid-cols-2">

@@ -13,6 +13,11 @@ export function outcomeFor(type: MarketTypeCode, home: number, away: number): "W
     case "DRAW": return home === away ? "WON" : "LOST";
     case "OVER_1_5": return total >= 2 ? "WON" : "LOST";
     case "UNDER_3_5": return total <= 3 ? "WON" : "LOST";
+    // spojeni tip prolazi samo ako prođu oba dela
+    case "HOME_OVER_1_5": return home > away && total >= 2 ? "WON" : "LOST";
+    case "HOME_UNDER_3_5": return home > away && total <= 3 ? "WON" : "LOST";
+    case "AWAY_OVER_1_5": return away > home && total >= 2 ? "WON" : "LOST";
+    case "AWAY_UNDER_3_5": return away > home && total <= 3 ? "WON" : "LOST";
   }
 }
 

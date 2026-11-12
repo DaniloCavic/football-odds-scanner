@@ -5,7 +5,7 @@ import { saveSettingsAction, type SettingsState } from "./actions";
 
 const input = "w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/30";
 
-export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChecks, goalsPair }: { maxOdds: number; stake: number; maxRequests: number; checkMinutes: number; opChecks: number; goalsPair: boolean }) {
+export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChecks, goalsPair, combine }: { maxOdds: number; stake: number; maxRequests: number; checkMinutes: number; opChecks: number; goalsPair: boolean; combine: boolean }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettingsAction, {});
   return (
     <form action={action} className="space-y-5">
@@ -41,6 +41,13 @@ export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChec
         <span>
           <span className="font-medium">Izbaci utakmice gde su i 2+ i 0–3 do maks. kvote</span>
           <span className="block text-xs text-muted">Takva utakmica je praktično igra na „2 ili 3 gola“ – robot ne čuva nijedan od ta dva tipa (1 i 2 ostaju).</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 rounded-xl border border-line p-3 text-sm">
+        <input type="checkbox" name="combineResultGoals" defaultChecked={combine} className="mt-0.5 accent-[var(--color-accent)]" />
+        <span>
+          <span className="font-medium">Spoji 1/2 i tip golova u jedan tip („1&2+“, „1&0–3“, „2&2+“, „2&0–3“)</span>
+          <span className="block text-xs text-muted">Igra se po kvoti kladionice za spojeni tip (bez ograničenja kvote). Ako izvor nema tu kvotu, utakmica se preskače.</span>
         </span>
       </label>
       {state.error && <p role="alert" className="rounded-lg bg-lost/10 px-3 py-2 text-sm text-lost">{state.error}</p>}

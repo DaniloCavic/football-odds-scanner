@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { isValidOdds, MARKET_LABELS, type MarketTypeCode } from "@/lib/odds";
+import { isCombo, isValidOdds, MARKET_LABELS, type MarketTypeCode } from "@/lib/odds";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -121,7 +121,10 @@ export async function addEntry(db: PrismaClient, input: { filterSetId: string; m
     }
     if (ms.match.kickoffTime <= now) throw new FilterError("Utakmica je već počela – tip ne može da se doda.");
     const odds = ms.odds.toNumber();
-    if (!isValidOdds(odds, input.maxOdds)) throw new FilterError(`Kvota ${odds.toFixed(2)} je iznad dozvoljene ${input.maxOdds.toFixed(2)}.`);
+    // pojedinačni tipovi: do maks. kvote; spojeni tipovi („1&2+“…): bez ograničenja, samo veća od 1.00
+    if (isCombo(ms.marketType) ? !(odds > 1) : !isValidOdds(odds, input.maxOdds)) {
+      throw new FilterError(`Kvota ${odds.toFixed(2)} je iznad dozvoljene ${input.maxOdds.toFixed(2)}.`);
+    }
 
     const type = ms.marketType as MarketTypeCode;
     const tracked = await tx.trackedSelection.upsert({

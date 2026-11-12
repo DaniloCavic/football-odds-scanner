@@ -51,6 +51,8 @@ model Settings {
   oddsPapiResultChecksPerDay Int      @default(10)
   /// Pravilo: ako su za istu utakmicu i 2+ i 0–3 do maks. kvote, izbacuju se oba tipa
   excludeGoalsPair           Boolean  @default(true)
+  /// Pravilo: 1/2 + jedan tip golova se igra kao spojeni tip (npr. „1&2+“) – ako kvota ne postoji, utakmica se preskače
+  combineResultGoals         Boolean  @default(true)
   updatedAt                  DateTime @updatedAt
 }
 
@@ -77,6 +79,11 @@ enum MarketType {
   AWAY
   OVER_1_5
   UNDER_3_5
+  /// Spojeni tipovi (jedno tržište kladionice „ishod + golovi“)
+  HOME_OVER_1_5
+  HOME_UNDER_3_5
+  AWAY_OVER_1_5
+  AWAY_UNDER_3_5
 }
 
 enum ScanStatus {
@@ -155,6 +162,10 @@ model RobotScan {
   fixturesExcluded Int               @default(0)
   /// Utakmice izbačene jer su imale i 2+ i 0–3 do maks. kvote
   pairsExcluded    Int               @default(0)
+  /// Utakmice preskočene jer izvor nema kvotu za spojeni tip
+  comboSkipped     Int               @default(0)
+  /// Napravljeni spojeni tipovi
+  combosCreated    Int               @default(0)
   selectionsFound  Int               @default(0)
   requestsUsed     Int               @default(0)
   errors           Json              @default("[]")

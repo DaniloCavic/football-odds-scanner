@@ -69,11 +69,16 @@ export function metrics(rows: StatRow[]): Metrics {
   };
 }
 
-export const TYPE_ORDER = ["HOME", "AWAY", "OVER_1_5", "UNDER_3_5", "DRAW"] as const;
-export const TYPE_LABEL: Record<string, string> = { HOME: "1", AWAY: "2", OVER_1_5: "2+", UNDER_3_5: "0–3", DRAW: "X" };
+export const TYPE_ORDER = ["HOME", "AWAY", "OVER_1_5", "UNDER_3_5", "HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5", "DRAW"] as const;
+export const TYPE_LABEL: Record<string, string> = {
+  HOME: "1", AWAY: "2", OVER_1_5: "2+", UNDER_3_5: "0–3", DRAW: "X",
+  HOME_OVER_1_5: "1&2+", HOME_UNDER_3_5: "1&0–3", AWAY_OVER_1_5: "2&2+", AWAY_UNDER_3_5: "2&0–3",
+};
+const OPTIONAL_TYPES = new Set(["DRAW", "HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"]);
 export const GROUPS = [
   { key: "result", label: "Konačan ishod (1, 2)", types: ["HOME", "AWAY", "DRAW"] },
   { key: "goals", label: "Golovi (2+, 0–3)", types: ["OVER_1_5", "UNDER_3_5"] },
+  { key: "combo", label: "Spojeni (1&2+, 1&0–3, 2&2+, 2&0–3)", types: ["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"] },
 ];
 
 export const ODDS_BUCKETS = [
@@ -125,11 +130,11 @@ function groupBy<T>(rows: T[], key: (r: T) => string | null) {
 
 export function computeStats(rows: StatRow[], granularity: Granularity = "day") {
   const overall = metrics(rows);
-  const byType = TYPE_ORDER.map((t) => ({ key: t, label: TYPE_LABEL[t], ...metrics(rows.filter((r) => r.marketType === t)) })).filter((x) => x.total > 0 || x.key !== "DRAW");
-  const byGroup = GROUPS.map((g) => ({ key: g.key, label: g.label, ...metrics(rows.filter((r) => g.types.includes(r.marketType))) }));
+  const byType = TYPE_ORDER.map((t) => ({ key: t, label: TYPE_LABEL[t], ...metrics(rows.filter((r) => r.marketType === t)) })).filter((x) => x.total > 0 || !OPTIONAL_TYPES.has(x.key));
+  const byGroup = GROUPS.map((g) => ({ key: g.key, label: g.label, ...metrics(rows.filter((r) => g.types.includes(r.marketType))) })).filter((g) => g.total > 0 || g.key !== "combo");
   const byOdds = ODDS_BUCKETS.map((b) => ({ key: b.key, label: b.key.replace("-", "–"), ...metrics(rows.filter((r) => bucketOf(r.odds, ODDS_BUCKETS) === b.key)) }));
   const bySpecOdds = SPEC_BUCKETS.map((b) => ({ key: b.key, label: b.key.replace("-", "–"), ...metrics(rows.filter((r) => bucketOf(r.odds, SPEC_BUCKETS) === b.key)) }));
-  const matrix = TYPE_ORDER.filter((t) => t !== "DRAW" || rows.some((r) => r.marketType === "DRAW")).map((t) => ({
+  const matrix = TYPE_ORDER.filter((t) => !OPTIONAL_TYPES.has(t) || rows.some((r) => r.marketType === t)).map((t) => ({
     key: t, label: TYPE_LABEL[t],
     cells: ODDS_BUCKETS.map((b) => {
       const m = metrics(rows.filter((r) => r.marketType === t && bucketOf(r.odds, ODDS_BUCKETS) === b.key));

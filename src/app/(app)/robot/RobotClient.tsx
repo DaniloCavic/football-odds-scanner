@@ -17,7 +17,7 @@ const PERIODS = [
 ] as const;
 type PeriodKey = (typeof PERIODS)[number][0];
 
-const TYPES = ["1", "2", "2+", "0–3"] as const;
+const TYPES = ["1", "2", "2+", "0–3", "1&2+", "1&0–3", "2&2+", "2&0–3"] as const;
 const STATUS_LABEL: Record<ScanStatusDto["status"], [string, string]> = {
   RUNNING: ["Radi", "bg-live/15 text-live"],
   COMPLETED: ["Završeno", "bg-won/15 text-won"],
@@ -231,12 +231,14 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
           <div className="h-2 overflow-hidden rounded-full bg-panel-2">
             <div className={`h-full rounded-full bg-accent transition-all ${running ? "animate-pulse" : ""}`} style={{ width: `${pct}%` }} />
           </div>
-          <dl className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4 lg:grid-cols-7">
+          <dl className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
             <Stat label="Početak" value={fmtTime.format(new Date(current.startedAt))} />
             <Stat label="Kraj" value={current.finishedAt ? fmtTime.format(new Date(current.finishedAt)) : "—"} />
             <Stat label="Pregledano utakmica" value={`${current.fixturesScanned}${current.fixturesTotal != null ? ` / ${current.fixturesTotal}` : ""}`} testId="scanned" />
             <Stat label="Izbačeno (virtuelno i sl.)" value={String(current.fixturesExcluded)} />
             <Stat label="Izbačeno (2+ i 0–3)" value={String(current.pairsExcluded ?? 0)} testId="pairs" />
+            <Stat label="Spojeni tipovi" value={String(current.combosCreated ?? 0)} testId="combos" />
+            <Stat label="Preskočeno (nema spojene kvote)" value={String(current.comboSkipped ?? 0)} testId="combo-skipped" />
             <Stat label="Pronađeno selekcija" value={String(current.selectionsFound)} testId="found" />
             <Stat label="API zahteva" value={current.isDemo ? "0 (DEMO)" : String(current.requestsUsed)} />
           </dl>
@@ -285,7 +287,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
                     <p className="mt-1.5 font-medium">{s.homeTeam} – {s.awayTeam}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {rows.map((r) => (
-                        <span key={r.id} data-odds={r.odds} title={`Izvor: ${r.source}, kvota od ${fmt.format(new Date(r.oddsTimestamp))}`}
+                        <span key={r.id} data-odds={r.odds} data-combo={r.label.includes("&") ? "1" : undefined} title={`Izvor: ${r.source}, kvota od ${fmt.format(new Date(r.oddsTimestamp))}`}
                           className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1 text-sm">
                           <span className="font-semibold">{r.label}</span>
                           <span className="tabular-nums text-accent">{r.odds.toFixed(2)}</span>
@@ -308,7 +310,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
                       <td className="px-3 py-2">{r.competition}</td>
                       <td className="px-3 py-2">{r.homeTeam} – {r.awayTeam}</td>
                       <td className="px-3 py-2 font-semibold">{r.label}</td>
-                      <td className="px-3 py-2 tabular-nums text-accent" data-odds={r.odds}>{r.odds.toFixed(2)}</td>
+                      <td className="px-3 py-2 tabular-nums text-accent" data-odds={r.odds} data-combo={r.label.includes("&") ? "1" : undefined}>{r.odds.toFixed(2)}</td>
                       <td className="px-3 py-2 text-xs text-muted"><span className="flex items-center gap-1.5">{r.source} {r.isDemo && <DemoBadge />}</span></td>
                     </tr>
                   ))}

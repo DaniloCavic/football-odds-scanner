@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
-import type { Metrics, Stats } from "@/lib/stats/compute";
+import { TYPE_LABEL, type Metrics, type Stats } from "@/lib/stats/compute";
 import { CumulativeLine, WonLostColumns, type PeriodPoint } from "./charts";
 
 const TZ = "Europe/Belgrade";
@@ -216,7 +216,7 @@ export function StatsClient({ sets }: { sets: { id: string; name: string; delete
                 <ul className="space-y-1.5 text-sm">
                   {stats.recentLost.slice(0, 10).map((r, i) => (
                     <li key={i} className="flex items-center gap-3 rounded-lg bg-panel-2/60 px-3 py-2">
-                      <span className="w-10 font-semibold">{({ HOME: "1", AWAY: "2", OVER_1_5: "2+", UNDER_3_5: "0–3", DRAW: "X" } as Record<string, string>)[r.marketType]}</span>
+                      <span className="w-14 font-semibold">{TYPE_LABEL[r.marketType] ?? r.marketType}</span>
                       <span className="min-w-0 flex-1 truncate">{r.match}<span className="block truncate text-xs text-muted">{r.country ? `${r.country} · ` : ""}{r.competition}</span></span>
                       <span className="tabular-nums text-muted">{r.odds.toFixed(2)}</span>
                       <span className="w-10 text-right tabular-nums">{r.home != null ? `${r.home}:${r.away}` : "—"}</span>

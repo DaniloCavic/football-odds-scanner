@@ -12,6 +12,7 @@ export async function getSettings() {
     resultCheckMinutes: s.resultCheckMinutes,
     oddsPapiResultChecksPerDay: s.oddsPapiResultChecksPerDay,
     excludeGoalsPair: s.excludeGoalsPair,
+    combineResultGoals: s.combineResultGoals,
     updatedAt: s.updatedAt,
   };
 }

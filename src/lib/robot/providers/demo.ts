@@ -39,6 +39,10 @@ export function demoFixtures(from: Date, to: Date): ProviderFixture[] {
       (["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).forEach((m) => {
         if (r() < 0.85) odds[m] = { price: pick(), changedAt: new Date() };
       });
+      // DEMO spojene kvote („1&2+“ …) – ponekad ih nema, da se vidi i preskakanje utakmice
+      (["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"] as const).forEach((m) => {
+        if (r() < 0.7) odds[m] = { price: Math.round((1.3 + r() * 1.2) * 100) / 100, changedAt: new Date() };
+      });
       out.push({
         externalId: `demo-${t}-${k}`,
         sport: "football",

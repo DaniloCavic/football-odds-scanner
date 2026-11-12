@@ -23,6 +23,8 @@ export async function getScanStatus(id: string) {
     fixturesScanned: s.fixturesScanned,
     fixturesExcluded: s.fixturesExcluded,
     pairsExcluded: s.pairsExcluded,
+    comboSkipped: s.comboSkipped,
+    combosCreated: s.combosCreated,
     selectionsFound: s.selectionsFound,
     requestsUsed: s.requestsUsed,
     errors: Array.isArray(s.errors) ? (s.errors as string[]) : [],

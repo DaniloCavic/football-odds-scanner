@@ -53,7 +53,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await expect(count(page)).toHaveText("2");
 
   // kvote u filteru poštuju pravilo
-  const odds = await page.locator("[data-testid=filter-list] [data-odds]").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-odds"))));
+  const odds = await page.locator("[data-testid=filter-list] [data-odds]:not([data-combo])").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-odds"))));
   expect(odds.every((o) => o > 1 && o <= 1.3)).toBe(true);
 
   // 3) duplikat preko API-ja se odbija

@@ -18,7 +18,7 @@ const fmtShort = new Intl.DateTimeFormat("sr-Latn-RS", { timeZone: TZ, day: "2-d
 const dayKey = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
 const fmtDay = (key: string) => new Intl.DateTimeFormat("sr-Latn-RS", { weekday: "short", day: "2-digit", month: "2-digit" }).format(new Date(`${key}T12:00:00Z`));
 const rsd = (n: number) => new Intl.NumberFormat("sr-Latn-RS", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " RSD";
-const TYPES = ["1", "2", "2+", "0–3"] as const;
+const TYPES = ["1", "2", "2+", "0–3", "1&2+", "1&0–3", "2&2+", "2&0–3"] as const;
 
 const store = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -242,7 +242,7 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                     <option value="odds">Po kvoti</option>
                   </select>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1 sm:col-span-2">
                   {TYPES.map((t) => (
                     <button key={t} type="button" aria-pressed={types.includes(t)} onClick={() => setTypes((x) => (x.includes(t) ? x.filter((y) => y !== t) : [...x, t]))}
                       className={`min-w-11 flex-1 rounded-lg border px-2 py-2 text-sm ${types.includes(t) ? "border-accent/60 bg-accent/10 text-accent" : "border-line text-muted"}`}>{t}</button>
@@ -370,7 +370,7 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                           <p className="truncate font-medium">{e.homeTeam} – {e.awayTeam}</p>
                           <p className="truncate text-xs text-muted">{fmt.format(new Date(e.kickoffTime))} · {e.competition} · {e.source} {e.isDemo && <DemoBadge />}</p>
                         </div>
-                        <span className="tabular-nums text-accent" data-odds={e.odds}>{e.odds.toFixed(2)}</span>
+                        <span className="tabular-nums text-accent" data-odds={e.odds} data-combo={e.label.includes("&") ? "1" : undefined}>{e.odds.toFixed(2)}</span>
                         <span className="hidden flex-col items-end gap-0.5 sm:flex">
                           <StatusPill status={e.status} />
                           {e.netProfit != null && <span className={`text-xs tabular-nums ${e.netProfit > 0 ? "text-won" : e.netProfit < 0 ? "text-lost" : "text-muted"}`}>{e.home != null ? `${e.home}:${e.away} · ` : ""}{signedRsd(e.netProfit)}</span>}

@@ -2,9 +2,9 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { log } from "@/lib/log";
-import { isValidOdds, MARKET_TYPES } from "@/lib/odds";
+import { COMBO_TYPES, isValidOdds, MARKET_TYPES, type ComboTypeCode, type MarketTypeCode } from "@/lib/odds";
 import { isRealFootball } from "./football";
-import { applyGoalsPairRule } from "./rules";
+import { applyMatchRules } from "./rules";
 import { getProvider } from "./providers";
 import { ProviderError, RequestLimitReached, type ScanContext } from "./types";
 
@@ -81,8 +81,23 @@ export async function runScan(scanId: string): Promise<void> {
       }
       const rawValid = MARKET_TYPES.filter((m) => fx.odds[m] && isValidOdds(fx.odds[m]!.price, maxOdds));
       for (const m of rawValid) priceCounts[m].valid += 1;
-      const { kept: valid, pairExcluded } = applyGoalsPairRule(rawValid, settings?.excludeGoalsPair ?? true);
-      if (pairExcluded) await prisma.robotScan.update({ where: { id: scanId }, data: { pairsExcluded: { increment: 1 } } });
+      const combosAvail: Partial<Record<ComboTypeCode, number>> = {};
+      for (const c of COMBO_TYPES) if (fx.odds[c]) combosAvail[c] = fx.odds[c]!.price;
+      const rule = applyMatchRules(rawValid, combosAvail, {
+        excludeGoalsPair: settings?.excludeGoalsPair ?? true,
+        combineResultGoals: settings?.combineResultGoals ?? true,
+      });
+      const valid: MarketTypeCode[] = [...rule.singles, ...(rule.combo ? [rule.combo] : [])];
+      if (rule.pairExcluded || rule.comboMissing || rule.combo) {
+        await prisma.robotScan.update({
+          where: { id: scanId },
+          data: {
+            pairsExcluded: { increment: rule.pairExcluded ? 1 : 0 },
+            comboSkipped: { increment: rule.comboMissing ? 1 : 0 },
+            combosCreated: { increment: rule.combo ? 1 : 0 },
+          },
+        });
+      }
       let created = 0;
       if (valid.length) {
         const match = await prisma.match.upsert({

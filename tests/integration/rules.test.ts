@@ -62,3 +62,17 @@ describe("pravilo 2+ i 0–3 – stari podaci", () => {
     await expect(addEntry(db, { filterSetId: set2, marketSelectionId: ids.Par.OVER_1_5, maxOdds: 1.3 })).rejects.toThrow(/izbačen pravilom/);
   });
 });
+
+describe("spojeni tip u filteru", () => {
+  it("kvota spojenog tipa iznad 1.30 se prihvata, pojedinačni tip iznad 1.30 ne", async () => {
+    const scan = await db.robotScan.create({ data: { provider: "t", periodLabel: "T", startDate: new Date(), endDate: new Date(Date.now() + 9 * HOUR), maxOddsUsed: 1.3, status: "COMPLETED" } });
+    const match = await db.match.create({ data: { provider: "t", externalId: `c-${Math.random()}`, homeTeam: "A", awayTeam: "B", competition: "L", kickoffTime: new Date(Date.now() + 5 * HOUR) } });
+    const combo = await db.marketSelection.create({ data: { matchId: match.id, scanId: scan.id, marketType: "HOME_OVER_1_5", odds: 1.62, oddsTimestamp: new Date(), source: "T" } });
+    const single = await db.marketSelection.create({ data: { matchId: match.id, scanId: scan.id, marketType: "AWAY", odds: 1.45, oddsTimestamp: new Date(), source: "T" } });
+    const set = await createFilterSet(db, { name: "F", userId: null, stake: 1000 });
+    await addEntry(db, { filterSetId: set, marketSelectionId: combo.id, maxOdds: 1.3 });
+    await expect(addEntry(db, { filterSetId: set, marketSelectionId: single.id, maxOdds: 1.3 })).rejects.toThrow(/iznad/);
+    const e = await listEntries(db, set);
+    expect(e.map((x) => [x.label, x.odds])).toEqual([["1&2+", 1.62]]);
+  });
+});

@@ -36,6 +36,16 @@ Ako su za istu utakmicu i 2+ i 0–3 do maks. kvote, robot ne čuva nijedan od t
   - brojke skeniranja se preračunavaju, a promena ide u audit log
 - U istom filteru se ne može dodati suprotan tip golova za utakmicu koja već ima jedan.
 
+## Pravilo spajanja „ishod + golovi“
+Ako su za istu utakmicu do maks. kvote **1 (ili 2) i tačno jedan tip golova** (2+ ili 0–3), igra se **spojeni tip** („1&2+“, „1&0–3“, „2&2+“, „2&0–3“):
+- Kvota je ona koju za taj spojeni tip daje kladionica, bez ograničenja kvote.
+- **Ako izvor nema kvotu spojenog tipa, cela utakmica se preskače.**
+- Kad su sva tri tipa do maks. kvote (1 + 2+ + 0–3), igra se samo 1 (ili 2).
+- Spojeni tip prolazi samo ako prođu oba dela.
+- U statistici spojeni tipovi imaju svoje redove i grupu.
+- Pravilo se uključuje i isključuje u Podešavanjima.
+- OddsPapi za AdmiralBet trenutno ne šalje spojena tržišta. Robot ih prepoznaje automatski kad stignu (dijagnostika „Spojena tržišta u OddsPapi katalogu“).
+
 ## Filter (faza 3)
 - Imenovani filteri (FilterSet) sa ulogom po tipu (podrazumevano 1.000 RSD iz Podešavanja).
 - Tip se dodaje prevlačenjem ili dugmetom +. U bazi se čuva odmah, sa nepromenljivim snimkom kvote i uloga.

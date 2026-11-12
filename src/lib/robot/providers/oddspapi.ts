@@ -93,6 +93,20 @@ export function resolveOutcomeMap(markets: OddsPapiMarket[]): OutcomeMap {
     if (/(2\+|over\s*1\.5|two or more|at least 2)/i.test(m.marketName)) add("OVER_1_5", m, /^yes$/i);
     if (/(0\s*[-–]\s*3|under\s*3\.5|3 or (less|fewer))/i.test(m.marketName)) add("UNDER_3_5", m, /^yes$/i);
   }
+  // 4) Spojena tržišta „ishod + golovi“ (npr. „1 & Over 1.5“, „Home and Under 3.5“)
+  for (const m of ft) {
+    if (!/(result|1x2|winner|match).*(total|goal|over|under)|&/i.test(`${m.marketName} ${m.marketType}`) || /half|corner|card|booking|team 1|team 2/i.test(m.marketName)) continue;
+    for (const o of m.outcomes) {
+      const n = o.outcomeName.toLowerCase();
+      const side = /^(1|home)\b/.test(n) ? "HOME" : /^(2|away)\b/.test(n) ? "AWAY" : null;
+      const dir = /over|\+|više|vise/.test(n) ? "OVER" : /under|manje|0\s*[-–]\s*3/.test(n) ? "UNDER" : null;
+      const lineInName = n.match(/(\d)[.,]5/)?.[0]?.replace(",", ".");
+      const line = lineInName ? Number(lineInName) : /2\+/.test(n) ? 1.5 : /0\s*[-–]\s*3/.test(n) ? 3.5 : m.handicap;
+      if (!side || !dir) continue;
+      const type = dir === "OVER" && Math.abs(line - 1.5) < 1e-9 ? `${side}_OVER_1_5` : dir === "UNDER" && Math.abs(line - 3.5) < 1e-9 ? `${side}_UNDER_3_5` : null;
+      if (type) (map[type as MarketTypeCode] ??= []).push({ marketId: String(m.marketId), outcomeId: String(o.outcomeId) });
+    }
+  }
   // bez duplikata
   for (const k of Object.keys(map) as MarketTypeCode[]) {
     const seen = new Set<string>();
