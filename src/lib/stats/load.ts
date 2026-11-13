@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import type { StatRow } from "./compute";
+import type { CandidateRow, StatRow } from "./compute";
 
 export type StatQuery = {
   from?: Date | null;
@@ -43,4 +43,29 @@ export async function loadStatRows(q: StatQuery): Promise<StatRow[]> {
     home: r.trackedSelection.finalHomeScore,
     away: r.trackedSelection.finalAwayScore,
   }));
+}
+
+/** Kandidati za spojeni tip u periodu (po utakmici – poslednji kandidat), sa rezultatom utakmice ako je poznat. */
+export async function loadCandidateRows(q: Pick<StatQuery, "from" | "to" | "includeDemo">): Promise<CandidateRow[]> {
+  const rows = await prisma.comboCandidate.findMany({
+    where: {
+      match: {
+        kickoffTime: { ...(q.from ? { gte: q.from } : {}), ...(q.to ? { lt: q.to } : {}) },
+        ...(q.includeDemo ? {} : { isDemo: false }),
+      },
+    },
+    include: { match: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const seen = new Set<string>();
+  const out: CandidateRow[] = [];
+  for (const r of rows) {
+    if (seen.has(r.matchId)) continue;
+    seen.add(r.matchId);
+    out.push({
+      matchId: r.matchId, comboType: r.comboType, winnerOdds: r.winnerOdds.toNumber(), goalsOdds: r.goalsOdds.toNumber(),
+      home: r.match.finalHomeScore, away: r.match.finalAwayScore,
+    });
+  }
+  return out;
 }

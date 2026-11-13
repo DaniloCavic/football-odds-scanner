@@ -112,6 +112,12 @@ export async function addEntry(db: PrismaClient, input: { filterSetId: string; m
     const ms = await tx.marketSelection.findUnique({ where: { id: input.marketSelectionId }, include: { match: true } });
     if (!ms) throw new FilterError("Tip ne postoji.", 404);
     if (ms.excludedReason) throw new FilterError("Ovaj tip je izbačen pravilom (2+ i 0–3 za istu utakmicu).");
+    if (!isCombo(ms.marketType)) {
+      const combo = await tx.filterSetSelection.findFirst({
+        where: { filterSetId: set.id, removedAt: null, trackedSelection: { matchId: ms.matchId, marketType: { in: ["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"] } } },
+      });
+      if (combo) throw new FilterError("Ova utakmica je u filteru kao spojeni tip – pojedinačni tip se ne dodaje.");
+    }
     if (input.excludeGoalsPair !== false && (ms.marketType === "OVER_1_5" || ms.marketType === "UNDER_3_5")) {
       const other = ms.marketType === "OVER_1_5" ? "UNDER_3_5" : "OVER_1_5";
       const clash = await tx.filterSetSelection.findFirst({
@@ -162,7 +168,7 @@ export async function addEntries(db: PrismaClient, input: { filterSetId: string;
       if (e.status === 404 && /Filter/.test(e.message)) throw e;
       if (e.status === 409) result.duplicate += 1;
       else if (/počela/.test(e.message)) result.started += 1;
-      else if (/2\+ \/ 0–3|izbačen pravilom/.test(e.message)) result.pair = (result.pair ?? 0) + 1;
+      else if (/2\+ \/ 0–3|izbačen pravilom|spojeni tip/.test(e.message)) result.pair = (result.pair ?? 0) + 1;
       else result.invalid += 1;
     }
   }

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Card, EmptyState } from "@/components/ui";
-import { TYPE_LABEL, type Metrics, type Stats } from "@/lib/stats/compute";
+import { TYPE_LABEL, type CandidateStats, type Metrics, type Stats as BaseStats } from "@/lib/stats/compute";
+
+type Stats = BaseStats & { strategies: (Metrics & { key: string; label: string })[]; candidates: CandidateStats };
 import { CumulativeLine, WonLostColumns, type PeriodPoint } from "./charts";
 
 const TZ = "Europe/Belgrade";
@@ -109,6 +111,43 @@ export function StatsClient({ sets }: { sets: { id: string; name: string; delete
             <p className="text-xs text-muted">Nije u obračunu: {o.open} na čekanju/uživo/odloženo{o.review ? `, ${o.review} potrebna provera` : ""} – ne ulaze u prolaznost ni profit.</p>
           )}
           <Insight m={o} />
+
+          <Card>
+            <h2 className="mb-1 font-semibold">Strategije</h2>
+            <p className="mb-4 text-xs text-muted">Isti tipovi, različiti pristupi – koji bi doneo plus. Bela crta = prolaznost potrebna za nulu.</p>
+            <BarTable rows={stats.strategies.filter((x) => x.total > 0)} testId="strategies" />
+          </Card>
+
+          {stats.candidates.total > 0 && (
+            <Card>
+              <h2 className="mb-1 font-semibold">Spojeni tipovi – svi kandidati (virtuelno)</h2>
+              <p className="mb-4 text-xs text-muted">
+                Utakmice gde je robot tražio spojeni tip ({stats.candidates.total}, sa rezultatom {stats.candidates.withResult}). Kvota spojenog tipa nije poznata za sve,
+                zato je prikazana <b>potrebna kvota za plus</b>: ako AdmiralBet nudi veću, spojeni tip se isplati. Pored je poređenje sa igranjem samo 1/2 ili samo tipa golova (ulog 1.000 RSD).
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm" data-testid="candidates">
+                  <thead className="text-muted">
+                    <tr>{["Spojeni tip", "Utakmica", "Prošlo oba dela", "Potrebna kvota za plus", "Samo 1/2: prolaznost", "Samo 1/2: neto", "Samo golovi: prolaznost", "Samo golovi: neto"].map((h) => <th key={h} className="py-2 text-right font-medium first:text-left">{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {[{ key: "all", label: "Svi", ...stats.candidates.overall }, ...stats.candidates.byType].map((c) => (
+                      <tr key={c.key} className="border-t border-line/60 tabular-nums">
+                        <td className="py-2 text-left font-semibold">{c.label}</td>
+                        <td className="text-right">{c.matches}</td>
+                        <td className="text-right">{pct(c.comboPassRate)}</td>
+                        <td className="text-right font-semibold">{c.neededOdds == null ? "—" : `> ${c.neededOdds.toFixed(2)}`}</td>
+                        <td className="text-right">{pct(c.winnerPassRate)}</td>
+                        <td className={`text-right ${tone(c.winnerNet)}`}>{c.matches ? signed(c.winnerNet) : "—"}</td>
+                        <td className="text-right">{pct(c.goalsPassRate)}</td>
+                        <td className={`text-right ${tone(c.goalsNet)}`}>{c.matches ? signed(c.goalsNet) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
 
           <div className="grid gap-4">
             <Card>

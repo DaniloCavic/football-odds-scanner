@@ -41,7 +41,8 @@ export function demoFixtures(from: Date, to: Date): ProviderFixture[] {
       });
       // DEMO spojene kvote („1&2+“ …) – ponekad ih nema, da se vidi i preskakanje utakmice
       (["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"] as const).forEach((m) => {
-        if (r() < 0.7) odds[m] = { price: Math.round((1.3 + r() * 1.2) * 100) / 100, changedAt: new Date() };
+        const p = Math.round((1.3 + r() * 1.2) * 100) / 100;
+        if (i % 2 === 0) odds[m] = { price: p, changedAt: new Date() }; // svaka druga utakmica nema spojene kvote → kandidat za ručni unos
       });
       out.push({
         externalId: `demo-${t}-${k}`,

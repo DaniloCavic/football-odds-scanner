@@ -29,8 +29,8 @@ describe("spajanje 1/2 + tip golova", () => {
     expect(applyMatchRules(["AWAY", "UNDER_3_5"], { AWAY_UNDER_3_5: 1.45 }, ON).combo).toBe("AWAY_UNDER_3_5");
   });
   it("nema kvote za spojeni tip → po podešavanju", () => {
-    expect(applyMatchRules(["HOME", "UNDER_3_5"], { HOME_OVER_1_5: 1.5 }, { ...ON, comboFallback: "SKIP" })).toEqual({ singles: [], combo: null, pairExcluded: false, comboMissing: true });
-    expect(applyMatchRules(["HOME", "UNDER_3_5"], {}, ON)).toEqual({ singles: ["HOME"], combo: null, pairExcluded: false, comboMissing: true }); // podrazumevano: samo 1
+    expect(applyMatchRules(["HOME", "UNDER_3_5"], { HOME_OVER_1_5: 1.5 }, { ...ON, comboFallback: "SKIP" })).toEqual({ singles: [], combo: null, pairExcluded: false, comboMissing: true, wanted: "HOME_UNDER_3_5" });
+    expect(applyMatchRules(["HOME", "UNDER_3_5"], {}, ON)).toEqual({ singles: ["HOME"], combo: null, pairExcluded: false, comboMissing: true, wanted: "HOME_UNDER_3_5" }); // podrazumevano: samo 1
     expect(applyMatchRules(["AWAY", "OVER_1_5"], {}, { ...ON, comboFallback: "WINNER_ONLY" }).singles).toEqual(["AWAY"]);
     expect(applyMatchRules(["HOME", "OVER_1_5"], {}, { ...ON, comboFallback: "BOTH_SINGLE" }).singles).toEqual(["HOME", "OVER_1_5"]);
   });

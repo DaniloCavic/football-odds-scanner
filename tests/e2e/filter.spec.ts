@@ -35,7 +35,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await expect(count(page)).toHaveText("0");
 
   // 1) dugme +
-  const firstAdd = page.getByRole("button", { name: /^Dodaj (?!sve)/ }).first();
+  const firstAdd = page.getByRole("button", { name: /^Dodaj (?!sve|spojeni)/ }).first();
   await firstAdd.click();
   await expect(count(page)).toHaveText("1");
   await expect(page.getByLabel("Već u filteru").first()).toBeVisible();
@@ -84,7 +84,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
 
   // 7) dodaj sve – uz potvrdu, preskače ono što je već u filteru
   await page.getByRole("button", { name: /^Ukloni / }).count();
-  await page.getByRole("button", { name: /^Dodaj (?!sve)/ }).first().click();
+  await page.getByRole("button", { name: /^Dodaj (?!sve|spojeni)/ }).first().click();
   await expect(count(page)).toHaveText("1");
   await page.getByRole("button", { name: "2+", exact: true }).click();
   const bulk = page.getByRole("button", { name: /Dodaj sve u filter/ });
@@ -112,7 +112,7 @@ test("telefon: dodavanje dugmetom + i nema horizontalnog skrola", async ({ page,
   await page.goto("/filter");
   await page.getByRole("button", { name: "+ Novi filter" }).click();
   await page.getByRole("button", { name: "Napravi" }).click();
-  await page.getByRole("button", { name: /^Dodaj (?!sve)/ }).first().click();
+  await page.getByRole("button", { name: /^Dodaj (?!sve|spojeni)/ }).first().click();
   await expect(count(page)).toHaveText("1");
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

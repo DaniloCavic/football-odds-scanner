@@ -44,7 +44,9 @@ Ako su za istu utakmicu do maks. kvote **1 (ili 2) i tačno jedan tip golova** (
 - Spojeni tip prolazi samo ako prođu oba dela.
 - U statistici spojeni tipovi imaju svoje redove i grupu.
 - Pravilo se uključuje i isključuje u Podešavanjima.
-- OddsPapi za AdmiralBet trenutno ne šalje spojena tržišta. Robot ih prepoznaje automatski kad stignu (dijagnostika „Spojena tržišta u OddsPapi katalogu“).
+- Nijedan API ne prenosi srpske „Kombinacije“, pa robot pravi **kandidata** (`ComboCandidate`) sa kvotama oba dela.
+- Na stranici Filter korisnik unese kvotu sa AdmiralBet-a („Kombinacije“), a aplikacija sačuva spojeni tip (`manualOdds`). On zamenjuje pojedinačne tipove te utakmice u filteru.
+- Statistika → **Strategije** poredi pristupe na istim tipovima. Tabela **„Spojeni tipovi – svi kandidati (virtuelno)“** pokazuje prolaznost spojenog tipa i potrebnu kvotu za plus, i poređenje sa igranjem samo 1/2 ili samo golova. Rezultate kandidata tracker uzima iz istog dnevnog API-Football odgovora, bez dodatnih zahteva.
 
 ## Filter (faza 3)
 - Imenovani filteri (FilterSet) sa ulogom po tipu (podrazumevano 1.000 RSD iz Podešavanja).

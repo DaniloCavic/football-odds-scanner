@@ -18,8 +18,10 @@ export type RuleResult = {
   /** Spojeni tip koji se čuva (kvota iz izvora). */
   combo: ComboTypeCode | null;
   pairExcluded: boolean;
-  /** Utakmica preskočena – trebao je spojeni tip, a izvor nema njegovu kvotu. */
+  /** Trebao je spojeni tip, a izvor nema njegovu kvotu. */
   comboMissing: boolean;
+  /** Koji spojeni tip je trebao (za ručni unos kvote). */
+  wanted?: ComboTypeCode;
 };
 
 /**
@@ -51,5 +53,5 @@ export function applyMatchRules(
   // izvor nema kvotu spojenog tipa – šta igramo (podešavanje)
   const fb = opts.comboFallback ?? "WINNER_ONLY";
   const singles: MarketTypeCode[] = fb === "WINNER_ONLY" ? [winner, ...others] : fb === "BOTH_SINGLE" ? kept : [];
-  return { singles, combo: null, pairExcluded, comboMissing: true };
+  return { singles, combo: null, pairExcluded, comboMissing: true, wanted: combo };
 }

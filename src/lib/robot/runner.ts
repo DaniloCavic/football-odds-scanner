@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { log } from "@/lib/log";
-import { COMBO_TYPES, isValidOdds, MARKET_TYPES, type ComboTypeCode, type MarketTypeCode } from "@/lib/odds";
+import { COMBO_PARTS, COMBO_TYPES, isValidOdds, MARKET_TYPES, type ComboTypeCode, type MarketTypeCode } from "@/lib/odds";
 import { isRealFootball } from "./football";
 import { applyMatchRules, type ComboFallback } from "./rules";
 import { getProvider } from "./providers";
@@ -100,7 +100,7 @@ export async function runScan(scanId: string): Promise<void> {
         });
       }
       let created = 0;
-      if (valid.length) {
+      if (valid.length || rule.wanted) {
         const match = await prisma.match.upsert({
           where: { provider_externalId: { provider: provider.matchNamespace ?? provider.id, externalId: fx.externalId } },
           create: {
@@ -118,6 +118,15 @@ export async function runScan(scanId: string): Promise<void> {
           skipDuplicates: true,
         });
         created = res.count;
+        // kandidat za ručni unos spojene kvote („1&2+“ …)
+        if (rule.wanted) {
+          const [w, g] = COMBO_PARTS[rule.wanted];
+          await prisma.comboCandidate.upsert({
+            where: { scanId_matchId: { scanId, matchId: match.id } },
+            create: { scanId, matchId: match.id, comboType: rule.wanted, winnerOdds: fx.odds[w]!.price, goalsOdds: fx.odds[g]!.price, source: provider.sourceLabel },
+            update: {},
+          });
+        }
       }
       await prisma.robotScan.update({
         where: { id: scanId },

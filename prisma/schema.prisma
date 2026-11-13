@@ -114,6 +114,7 @@ model Match {
   finalHomeScore        Int?
   finalAwayScore        Int?
   resultUpdates         ResultUpdate[]
+  comboCandidates       ComboCandidate[]
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   selections            MarketSelection[]
@@ -137,6 +138,8 @@ model MarketSelection {
   isDemo         Boolean              @default(false)
   /// Izbačeno po pravilu (npr. GOALS_PAIR = i 2+ i 0–3 za istu utakmicu) – ne prikazuje se i ne ulazi u statistiku
   excludedReason String?
+  /// Kvotu je ručno uneo korisnik (npr. spojeni tip sa sajta kladionice)
+  manualOdds     Boolean              @default(false)
   createdAt      DateTime             @default(now())
   tracked        TrackedSelection[]
   filterEntries  FilterSetSelection[]
@@ -175,6 +178,7 @@ model RobotScan {
   diagnostics      Json              @default("{}")
   updatedAt        DateTime          @updatedAt
   selections       MarketSelection[]
+  comboCandidates  ComboCandidate[]
 
   @@index([startedAt])
   @@index([status])
@@ -277,4 +281,21 @@ model JobState {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+/// Utakmica kojoj treba spojeni tip („1&2+“…), a izvor nema njegovu kvotu – korisnik je unosi ručno.
+model ComboCandidate {
+  id         String     @id @default(cuid())
+  scanId     String
+  scan       RobotScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  matchId    String
+  match      Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  comboType  MarketType
+  winnerOdds Decimal    @db.Decimal(8, 4)
+  goalsOdds  Decimal    @db.Decimal(8, 4)
+  source     String
+  createdAt  DateTime   @default(now())
+
+  @@unique([scanId, matchId])
+  @@index([matchId])
 }

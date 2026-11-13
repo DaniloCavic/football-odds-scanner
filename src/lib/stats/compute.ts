@@ -166,3 +166,71 @@ export function computeStats(rows: StatRow[], granularity: Granularity = "day") 
   return { overall, byType, byGroup, byOdds, bySpecOdds, matrix, byCompetition, timeline, byFilterSet, recentLost };
 }
 export type Stats = ReturnType<typeof computeStats>;
+
+/** Strategije iz istih zapisa – kako bi prošao svaki pristup. */
+export function computeStrategies(rows: StatRow[]) {
+  const singles = ["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"];
+  const combos = ["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"];
+  const list: { key: string; label: string; f: (r: StatRow) => boolean }[] = [
+    { key: "all", label: "Sve u filterima", f: () => true },
+    { key: "singles", label: "Samo pojedinačni (1, 2, 2+, 0–3)", f: (r) => singles.includes(r.marketType) },
+    { key: "combos", label: "Samo spojeni (ručno unete kvote)", f: (r) => combos.includes(r.marketType) },
+    { key: "result", label: "Samo ishod (1, 2)", f: (r) => r.marketType === "HOME" || r.marketType === "AWAY" },
+    { key: "goals", label: "Samo golovi (2+, 0–3)", f: (r) => r.marketType === "OVER_1_5" || r.marketType === "UNDER_3_5" },
+    { key: "over", label: "Samo 2+", f: (r) => r.marketType === "OVER_1_5" },
+    { key: "under", label: "Samo 0–3", f: (r) => r.marketType === "UNDER_3_5" },
+    { key: "low", label: "Pojedinačni, kvote 1.01–1.15", f: (r) => singles.includes(r.marketType) && r.odds <= 1.15 + 1e-9 },
+    { key: "high", label: "Pojedinačni, kvote 1.16–1.30", f: (r) => singles.includes(r.marketType) && r.odds > 1.15 + 1e-9 },
+  ];
+  return list.map((s) => ({ key: s.key, label: s.label, ...metrics(rows.filter(s.f)) }));
+}
+
+export type CandidateRow = {
+  matchId: string;
+  comboType: string;
+  winnerOdds: number;
+  goalsOdds: number;
+  home: number | null;
+  away: number | null;
+};
+
+/**
+ * Kandidati za spojeni tip (virtuelno, ulog 1.000 RSD): da li bi prošao spojeni tip,
+ * i kako bi prošle alternative „samo 1/2“ i „samo tip golova“ za iste utakmice.
+ * Kvota spojenog tipa je nepoznata – prikazuje se potrebna kvota za nulu (= 1 / prolaznost).
+ */
+export function computeCandidateStats(cands: CandidateRow[], stake = 1000) {
+  const done = cands.filter((c) => c.home != null && c.away != null);
+  const types = ["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"];
+  const legWon = (c: CandidateRow, part: "w" | "g") => {
+    const h = c.home!, a = c.away!, t = h + a;
+    const [w, g] = c.comboType.split(/_(?=OVER|UNDER)/);
+    if (part === "w") return w === "HOME" ? h > a : a > h;
+    return g === "OVER_1_5" ? t >= 2 : t <= 3;
+  };
+  const summarize = (rs: CandidateRow[]) => {
+    const n = rs.length;
+    const both = rs.filter((c) => legWon(c, "w") && legWon(c, "g")).length;
+    const wWon = rs.filter((c) => legWon(c, "w"));
+    const gWon = rs.filter((c) => legWon(c, "g"));
+    const net = (won: CandidateRow[], odds: (c: CandidateRow) => number) => Math.round((won.reduce((a, c) => a + stake * (odds(c) - 1), 0) - (n - won.length) * stake) * 100) / 100;
+    const passBoth = n ? (both / n) * 100 : null;
+    return {
+      matches: n,
+      comboWon: both,
+      comboPassRate: passBoth,
+      neededOdds: passBoth ? 100 / passBoth : null,
+      winnerPassRate: n ? (wWon.length / n) * 100 : null,
+      winnerNet: net(wWon, (c) => c.winnerOdds),
+      goalsPassRate: n ? (gWon.length / n) * 100 : null,
+      goalsNet: net(gWon, (c) => c.goalsOdds),
+    };
+  };
+  return {
+    total: cands.length,
+    withResult: done.length,
+    overall: summarize(done),
+    byType: types.map((t) => ({ key: t, label: TYPE_LABEL[t], ...summarize(done.filter((c) => c.comboType === t)) })).filter((x) => x.matches > 0),
+  };
+}
+export type CandidateStats = ReturnType<typeof computeCandidateStats>;

@@ -28,7 +28,7 @@ test("ceo tok: filter → utakmica završena → obračun, profit, ručna isprav
   await page.getByLabel("Naziv novog filtera").fill("Rezultati E2E");
   await page.getByRole("button", { name: "Napravi" }).click();
   for (let i = 0; i < 3; i++) {
-    await page.getByRole("button", { name: /^Dodaj (?!sve)/ }).first().click();
+    await page.getByRole("button", { name: /^Dodaj (?!sve|spojeni)/ }).first().click();
     await expect(page.getByTestId("filter-count")).toHaveText(String(i + 1));
   }
 

@@ -11,6 +11,7 @@ import type { FilterEntryDto, FilterSetDto } from "@/lib/filter/service";
 import type { EntrySummary } from "@/lib/results/queries";
 import { StatusPill, signedRsd } from "@/components/status";
 import type { ScanStatusDto, SelectionDto } from "@/lib/robot/scans";
+import type { CandidateDto } from "@/lib/combos/service";
 
 const TZ = "Europe/Belgrade";
 const fmt = new Intl.DateTimeFormat("sr-Latn-RS", { timeZone: TZ, weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -82,11 +83,26 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
   useEffect(() => { const iv = setInterval(() => refreshEntries(setId), 60_000); return () => clearInterval(iv); }, [setId, refreshEntries]);
 
   useEffect(() => { refreshEntries(setId); if (setId) store.set("fos.filter.set", setId); }, [setId, refreshEntries]);
+  const [candidates, setCandidates] = useState<CandidateDto[]>([]);
+  const loadCandidates = useCallback(async (id: string | null) => {
+    if (!id) return setCandidates([]);
+    api<CandidateDto[]>(`/api/robot/scans/${id}/candidates`).then(setCandidates).catch(() => setCandidates([]));
+  }, []);
   useEffect(() => {
     if (!scanId) return setSelections([]);
     store.set("fos.filter.scan", scanId);
     api<SelectionDto[]>(`/api/robot/scans/${scanId}/selections`).then(setSelections).catch(() => setSelections([]));
-  }, [scanId]);
+    loadCandidates(scanId);
+  }, [scanId, loadCandidates]);
+
+  async function addCombo(c: CandidateDto, odds: string) {
+    if (!setId) return flash("Prvo napravite ili izaberite filter (desno).", "err");
+    try {
+      const r = await api<{ replaced: number; odds: number }>(`/api/filter-sets/${setId}/combo`, { method: "POST", body: JSON.stringify({ candidateId: c.id, odds }) });
+      flash(`Dodato: ${c.homeTeam} – ${c.awayTeam}, ${c.label} @ ${r.odds.toFixed(2)}${r.replaced ? ` (zamenjeno ${r.replaced} pojedinačnih tipova)` : ""}`);
+      await Promise.all([refreshEntries(setId), refreshSets(), loadCandidates(scanId)]);
+    } catch (e) { flash((e as Error).message, "err"); }
+  }
 
   const inFilter = useMemo(() => new Set(entries.map((e) => `${e.matchId}|${e.marketType}`)), [entries]);
   const activeSet = sets.find((s) => s.id === setId) ?? null;
@@ -254,6 +270,9 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                   <input value={maxOdds} onChange={(e) => setMaxOdds(e.target.value)} placeholder="do" aria-label="Kvota do" inputMode="decimal" className={`${inputCls} w-full`} />
                 </div>
               </div>
+              {candidates.length > 0 && (
+                <ComboCandidates candidates={candidates} inFilter={inFilter} now={now} onAdd={addCombo} />
+              )}
               {(() => {
                 const addable = filtered.filter((s) => !inFilter.has(`${s.matchId}|${s.marketType}`) && new Date(s.kickoffTime).getTime() > now);
                 return (
@@ -440,5 +459,45 @@ function DropZone({ active, children }: { active: boolean; children: React.React
       className={`min-h-40 rounded-xl border-2 border-dashed p-2 transition-colors ${isOver ? "border-accent bg-accent/15" : active ? "border-accent/60 bg-accent/5" : "border-line"}`}>
       {children}
     </div>
+  );
+}
+
+function ComboCandidates({ candidates, inFilter, now, onAdd }: {
+  candidates: CandidateDto[]; inFilter: Set<string>; now: number; onAdd: (c: CandidateDto, odds: string) => void;
+}) {
+  const [odds, setOdds] = useState<Record<string, string>>({});
+  const open = candidates.filter((c) => new Date(c.kickoffTime).getTime() > now && !inFilter.has(`${c.matchId}|${c.comboType}`)).length;
+  return (
+    <details open className="mb-4 rounded-xl border border-live/40 bg-live/5 p-3" data-testid="combo-candidates">
+      <summary className="cursor-pointer text-sm font-semibold">Spojeni tipovi – unesi kvotu sa AdmiralBet-a ({open} od {candidates.length})</summary>
+      <p className="mt-1 text-xs text-muted">Na AdmiralBet-u otvori utakmicu → „Kombinacije“ i prepiši kvotu (npr. 1&2+). Spojeni tip zamenjuje pojedinačne tipove te utakmice u filteru.</p>
+      <ul className="mt-3 space-y-2">
+        {candidates.map((c) => {
+          const added = inFilter.has(`${c.matchId}|${c.comboType}`);
+          const started = new Date(c.kickoffTime).getTime() <= now;
+          return (
+            <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-panel/80 px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{c.homeTeam} – {c.awayTeam}</span>
+                <span className="block truncate text-xs text-muted">{fmt.format(new Date(c.kickoffTime))} · {c.competition} · {c.legs}</span>
+              </span>
+              <span className="rounded-md bg-accent/10 px-2 py-1 font-semibold text-accent">{c.label}</span>
+              {added ? (
+                <span className="text-sm text-accent" aria-label="Već u filteru">✓ {c.enteredOdds?.toFixed(2)}</span>
+              ) : started ? (
+                <span className="text-xs text-live">počela</span>
+              ) : (
+                <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); onAdd(c, odds[c.id] ?? ""); }}>
+                  <input value={odds[c.id] ?? (c.enteredOdds?.toFixed(2) ?? "")} onChange={(e) => setOdds({ ...odds, [c.id]: e.target.value })}
+                    inputMode="decimal" placeholder="kvota" aria-label={`Kvota ${c.label} ${c.homeTeam} – ${c.awayTeam}`}
+                    className="w-20 rounded-lg border border-line bg-bg px-2 py-1.5 text-sm tabular-nums outline-none focus:border-accent" />
+                  <button type="submit" aria-label={`Dodaj spojeni ${c.label} ${c.homeTeam} – ${c.awayTeam}`} className="rounded-lg bg-accent px-3 py-1.5 font-bold text-bg">+</button>
+                </form>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }

@@ -12,7 +12,7 @@ const KICK = new Date("2026-11-10T18:00:00Z"); // 19:00 u Beogradu
 async function wipe() {
   await db.$transaction([
     db.filterSetSelection.deleteMany(), db.filterSet.deleteMany(), db.trackedSelection.deleteMany(), db.resultUpdate.deleteMany(),
-    db.marketSelection.deleteMany(), db.robotScan.deleteMany(), db.match.deleteMany(), db.auditLog.deleteMany(), db.jobState.deleteMany(),
+    db.comboCandidate.deleteMany(), db.marketSelection.deleteMany(), db.robotScan.deleteMany(), db.match.deleteMany(), db.auditLog.deleteMany(), db.jobState.deleteMany(),
   ]);
 }
 beforeEach(wipe);

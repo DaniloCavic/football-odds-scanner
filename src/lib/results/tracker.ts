@@ -263,6 +263,25 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
         }
       }
     }
+    // Kandidati za spojeni tip (nisu nužno u filteru): rezultat iz ISTOG dnevnog API-Football odgovora – bez dodatnih zahteva
+    const cands = await db.comboCandidate.findMany({
+      where: { match: { finalHomeScore: null, isDemo: false, kickoffTime: { lt: new Date(now.getTime() - EXPECTED_END_MIN * MIN), gt: new Date(now.getTime() - 2 * 24 * 3600_000) } } },
+      include: { match: true },
+      distinct: ["matchId"],
+      take: 300,
+    });
+    for (const c of cands) {
+      const day = await getDay(ymdToString(zonedYmd(c.match.kickoffTime)));
+      if (!day) continue;
+      let fx = c.match.apiFootballId ? day.find((f) => f.id === c.match.apiFootballId) : undefined;
+      if (!fx && !c.match.apiFootballId) {
+        const r = findFixture({ homeTeam: c.match.homeTeam, awayTeam: c.match.awayTeam, kickoffTime: c.match.kickoffTime, competition: c.match.competition }, day);
+        if (r.status === "found" && r.confidence === "HIGH") fx = r.fixture;
+      }
+      if (fx && fx.status === "FINISHED" && fx.score90) {
+        await db.match.update({ where: { id: c.matchId }, data: { apiFootballId: fx.id, resultMatchConfidence: "HIGH", finalHomeScore: fx.score90.home, finalAwayScore: fx.score90.away, matchStatus: "FINISHED" } });
+      }
+    }
     return report;
   } finally {
     const afErr = await getState<{ until: string; message: string } | null>(db, "af:error", null).catch(() => null);
