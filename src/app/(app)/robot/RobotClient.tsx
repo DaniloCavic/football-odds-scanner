@@ -238,7 +238,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
             <Stat label="Izbačeno (virtuelno i sl.)" value={String(current.fixturesExcluded)} />
             <Stat label="Izbačeno (2+ i 0–3)" value={String(current.pairsExcluded ?? 0)} testId="pairs" />
             <Stat label="Spojeni tipovi" value={String(current.combosCreated ?? 0)} testId="combos" />
-            <Stat label="Preskočeno (nema spojene kvote)" value={String(current.comboSkipped ?? 0)} testId="combo-skipped" />
+            <Stat label="Bez spojene kvote" value={String(current.comboSkipped ?? 0)} testId="combo-skipped" />
             <Stat label="Pronađeno selekcija" value={String(current.selectionsFound)} testId="found" />
             <Stat label="API zahteva" value={current.isDemo ? "0 (DEMO)" : String(current.requestsUsed)} />
           </dl>

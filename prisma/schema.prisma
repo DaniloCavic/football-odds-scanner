@@ -53,6 +53,8 @@ model Settings {
   excludeGoalsPair           Boolean  @default(true)
   /// Pravilo: 1/2 + jedan tip golova se igra kao spojeni tip (npr. „1&2+“) – ako kvota ne postoji, utakmica se preskače
   combineResultGoals         Boolean  @default(true)
+  /// Šta kad izvor nema kvotu spojenog tipa: SKIP = preskoči utakmicu, WINNER_ONLY = igraj samo 1/2, BOTH_SINGLE = igraj oba tipa odvojeno
+  comboFallback              String   @default("WINNER_ONLY")
   updatedAt                  DateTime @updatedAt
 }
 

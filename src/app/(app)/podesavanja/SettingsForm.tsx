@@ -5,7 +5,7 @@ import { saveSettingsAction, type SettingsState } from "./actions";
 
 const input = "w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/30";
 
-export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChecks, goalsPair, combine }: { maxOdds: number; stake: number; maxRequests: number; checkMinutes: number; opChecks: number; goalsPair: boolean; combine: boolean }) {
+export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChecks, goalsPair, combine, fallback }: { maxOdds: number; stake: number; maxRequests: number; checkMinutes: number; opChecks: number; goalsPair: boolean; combine: boolean; fallback: string }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettingsAction, {});
   return (
     <form action={action} className="space-y-5">
@@ -47,7 +47,15 @@ export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChec
         <input type="checkbox" name="combineResultGoals" defaultChecked={combine} className="mt-0.5 accent-[var(--color-accent)]" />
         <span>
           <span className="font-medium">Spoji 1/2 i tip golova u jedan tip („1&2+“, „1&0–3“, „2&2+“, „2&0–3“)</span>
-          <span className="block text-xs text-muted">Igra se po kvoti kladionice za spojeni tip (bez ograničenja kvote). Ako izvor nema tu kvotu, utakmica se preskače.</span>
+          <span className="block text-xs text-muted">Igra se po kvoti kladionice za spojeni tip (bez ograničenja kvote).</span>
+          <span className="mt-2 block">
+            <label htmlFor="comboFallback" className="text-xs text-muted">Ako izvor nema kvotu spojenog tipa:</label>
+            <select id="comboFallback" name="comboFallback" defaultValue={fallback} className="mt-1 block w-full rounded-lg border border-line bg-bg px-2.5 py-1.5 text-sm">
+              <option value="WINNER_ONLY">Igraj samo 1 (ili 2), tip golova izbaci</option>
+              <option value="SKIP">Preskoči celu utakmicu</option>
+              <option value="BOTH_SINGLE">Igraj oba tipa odvojeno (kao ranije)</option>
+            </select>
+          </span>
         </span>
       </label>
       {state.error && <p role="alert" className="rounded-lg bg-lost/10 px-3 py-2 text-sm text-lost">{state.error}</p>}

@@ -13,6 +13,7 @@ export async function getSettings() {
     oddsPapiResultChecksPerDay: s.oddsPapiResultChecksPerDay,
     excludeGoalsPair: s.excludeGoalsPair,
     combineResultGoals: s.combineResultGoals,
+    comboFallback: s.comboFallback as "SKIP" | "WINNER_ONLY" | "BOTH_SINGLE",
     updatedAt: s.updatedAt,
   };
 }

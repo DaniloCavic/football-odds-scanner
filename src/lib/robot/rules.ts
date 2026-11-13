@@ -26,13 +26,16 @@ export type RuleResult = {
  * Sva pravila jedne utakmice, redom:
  * 1) 2+ i 0–3 oba do maks. kvote → izbacuju se oba (1/2 ostaje).
  * 2) 1 (ili 2) + tačno jedan tip golova → igra se SPOJENI tip („1&2+“, „1&0–3“, „2&2+“, „2&0–3“)
- *    po kvoti kladionice (bez ograničenja kvote). Ako izvor nema tu kvotu → cela utakmica se preskače.
+ *    po kvoti kladionice (bez ograničenja kvote). Ako izvor nema tu kvotu → po podešavanju:
+ *    WINNER_ONLY = samo 1/2 (podrazumevano), SKIP = preskoči utakmicu, BOTH_SINGLE = oba tipa odvojeno.
  * 3) Inače – pojedinačni tipovi kao do sada.
  */
+export type ComboFallback = "SKIP" | "WINNER_ONLY" | "BOTH_SINGLE";
+
 export function applyMatchRules(
   valid: MarketTypeCode[],
   availableCombos: Partial<Record<ComboTypeCode, number>>,
-  opts: { excludeGoalsPair: boolean; combineResultGoals: boolean },
+  opts: { excludeGoalsPair: boolean; combineResultGoals: boolean; comboFallback?: ComboFallback },
 ): RuleResult {
   const { kept, pairExcluded } = applyGoalsPairRule(valid, opts.excludeGoalsPair);
   if (!opts.combineResultGoals) return { singles: kept, combo: null, pairExcluded, comboMissing: false };
@@ -45,5 +48,8 @@ export function applyMatchRules(
   if (typeof price === "number" && Number.isFinite(price) && price > 1) {
     return { singles: others, combo, pairExcluded, comboMissing: false };
   }
-  return { singles: [], combo: null, pairExcluded, comboMissing: true };
+  // izvor nema kvotu spojenog tipa – šta igramo (podešavanje)
+  const fb = opts.comboFallback ?? "WINNER_ONLY";
+  const singles: MarketTypeCode[] = fb === "WINNER_ONLY" ? [winner, ...others] : fb === "BOTH_SINGLE" ? kept : [];
+  return { singles, combo: null, pairExcluded, comboMissing: true };
 }

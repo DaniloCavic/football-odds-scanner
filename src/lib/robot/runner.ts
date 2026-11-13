@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { log } from "@/lib/log";
 import { COMBO_TYPES, isValidOdds, MARKET_TYPES, type ComboTypeCode, type MarketTypeCode } from "@/lib/odds";
 import { isRealFootball } from "./football";
-import { applyMatchRules } from "./rules";
+import { applyMatchRules, type ComboFallback } from "./rules";
 import { getProvider } from "./providers";
 import { ProviderError, RequestLimitReached, type ScanContext } from "./types";
 
@@ -86,6 +86,7 @@ export async function runScan(scanId: string): Promise<void> {
       const rule = applyMatchRules(rawValid, combosAvail, {
         excludeGoalsPair: settings?.excludeGoalsPair ?? true,
         combineResultGoals: settings?.combineResultGoals ?? true,
+        comboFallback: (settings?.comboFallback as ComboFallback | undefined) ?? "WINNER_ONLY",
       });
       const valid: MarketTypeCode[] = [...rule.singles, ...(rule.combo ? [rule.combo] : [])];
       if (rule.pairExcluded || rule.comboMissing || rule.combo) {
