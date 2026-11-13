@@ -31,4 +31,9 @@ test("ručni unos spojenog tipa: kandidat → kvota → u filteru umesto pojedin
   await expect(page.getByTestId("filter-list")).toContainText("&");
   await expect(page.getByTestId("filter-list").locator("[data-combo]").first()).toHaveText("1.55");
   await expect(box.getByLabel("Već u filteru").first()).toBeVisible();
+
+  // počisti za sledeće testove (brojevi na dashboard-u)
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Obriši filter" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Filter je obrisan." })).toBeVisible();
 });
