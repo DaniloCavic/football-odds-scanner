@@ -2,7 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { log } from "@/lib/log";
-import { COMBO_PARTS, COMBO_TYPES, isValidOdds, MARKET_TYPES, type ComboTypeCode, type MarketTypeCode } from "@/lib/odds";
+import { COMBO_PARTS, COMBO_TYPES, isCombo, isValidOdds, MARKET_LABELS, MARKET_TYPES, type ComboTypeCode, type MarketTypeCode } from "@/lib/odds";
 import { isRealFootball } from "./football";
 import { applyMatchRules, type ComboFallback } from "./rules";
 import { getProvider } from "./providers";
@@ -37,6 +37,7 @@ export async function runScan(scanId: string): Promise<void> {
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
 
   const diag: Record<string, unknown> = {};
+  const ruleLog: { match: string; found: string[]; kept: string[]; note: string }[] = [];
   const priceCounts: Record<string, { total: number; valid: number; min: number | null }> = {};
   for (const m of MARKET_TYPES) priceCounts[m] = { total: 0, valid: 0, min: null };
   let lastStopCheck = 0;
@@ -89,6 +90,15 @@ export async function runScan(scanId: string): Promise<void> {
         comboFallback: (settings?.comboFallback as ComboFallback | undefined) ?? "WINNER_ONLY",
       });
       const valid: MarketTypeCode[] = [...rule.singles, ...(rule.combo ? [rule.combo] : [])];
+      if ((rule.pairExcluded || rule.comboMissing || rule.combo) && ruleLog.length < 300) {
+        ruleLog.push({
+          match: `${fx.homeTeam} – ${fx.awayTeam}`,
+          found: rawValid.map((m) => `${MARKET_LABELS[m]} @ ${fx.odds[m]!.price.toFixed(2)}`),
+          kept: valid.map((m) => `${MARKET_LABELS[m]}${isCombo(m) ? ` @ ${fx.odds[m]!.price.toFixed(2)}` : ""}`),
+          note: [rule.pairExcluded ? "2+ i 0–3 zajedno → izbačeni" : null, rule.combo ? "spojeni tip po kvoti izvora" : null,
+            rule.comboMissing ? `nema kvote za ${MARKET_LABELS[rule.wanted!]} → kandidat za ručni unos` : null].filter(Boolean).join("; "),
+        });
+      }
       if (rule.pairExcluded || rule.comboMissing || rule.combo) {
         await prisma.robotScan.update({
           where: { id: scanId },
@@ -147,6 +157,6 @@ export async function runScan(scanId: string): Promise<void> {
   }
   await prisma.robotScan.update({
     where: { id: scanId },
-    data: { status: finalStatus, finishedAt: new Date(), diagnostics: JSON.parse(JSON.stringify({ priceCounts, ...diag })) },
+    data: { status: finalStatus, finishedAt: new Date(), diagnostics: JSON.parse(JSON.stringify({ priceCounts, ...diag, ruleLog })) },
   });
 }

@@ -405,6 +405,18 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
             : <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2 text-[11px]">{JSON.stringify(d.rawSamples, null, 1)}</pre>}
         </div>
       )}
+      {d.ruleLog && (
+        <div className="mt-3 text-xs text-muted" data-testid="rule-log">
+          <p className="mb-1">Primena pravila ({d.ruleLog.length} utakmica):</p>
+          {d.ruleLog.length === 0 ? <p>Nijedna utakmica nije imala kombinaciju tipova na koju se pravilo primenjuje.</p> : (
+            <ul className="space-y-0.5">
+              {d.ruleLog.map((r, i) => (
+                <li key={i}><span className="text-text">{r.match}</span>: našao {r.found.join(", ")} → sačuvano: <b className="text-text">{r.kept.length ? r.kept.join(", ") : "ništa"}</b> <span>({r.note})</span></li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {d.comboCatalog && (
         <div className="mt-3 text-xs text-muted" data-testid="combo-catalog">
           <p className="mb-1">Spojena tržišta „ishod + golovi“ u OddsPapi katalogu: <b className="text-text">{d.comboCatalog.length}</b></p>

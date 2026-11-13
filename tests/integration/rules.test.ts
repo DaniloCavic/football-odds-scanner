@@ -120,3 +120,36 @@ describe("ručni unos spojenog tipa", () => {
     await expect(addManualCombo(db, { filterSetId: set, candidateId: cand.id, odds: "1.5", maxOdds: 1.3 })).rejects.toThrow(/počela/);
   });
 });
+
+import { runScan } from "@/lib/robot/runner";
+import * as providers from "@/lib/robot/providers";
+import { vi } from "vitest";
+
+describe("robot – pravila na celom skeniranju", () => {
+  it("1 + 2+ + 0–3 → sačuva se samo 1; 2 + 2+ + 0–3 → samo 2", async () => {
+    const kick = new Date(Date.now() + 5 * HOUR);
+    const fx = (id: string, odds: Record<string, number>) => ({
+      externalId: id, sport: "football" as const, homeTeam: `H${id}`, awayTeam: `A${id}`, competition: "L", country: "X",
+      externalCompetitionId: null, kickoffTime: kick,
+      odds: Object.fromEntries(Object.entries(odds).map(([k, p]) => [k, { price: p, changedAt: new Date() }])),
+    });
+    const fake = {
+      id: "fake", name: "Fake", sourceLabel: "Fake", isDemo: false,
+      async *scan() {
+        yield fx("1", { HOME: 1.2, OVER_1_5: 1.15, UNDER_3_5: 1.28 });
+        yield fx("2", { AWAY: 1.25, OVER_1_5: 1.1, UNDER_3_5: 1.3 });
+      },
+    };
+    vi.spyOn(providers, "getProvider").mockReturnValue(fake);
+    await db.settings.upsert({ where: { id: 1 }, create: { id: 1 }, update: { excludeGoalsPair: true, combineResultGoals: true, comboFallback: "WINNER_ONLY" } });
+    const scan = await db.robotScan.create({ data: { provider: "fake", periodLabel: "T", startDate: new Date(), endDate: new Date(Date.now() + 9 * HOUR), maxOddsUsed: 1.3 } });
+    await runScan(scan.id);
+    const saved = await db.marketSelection.findMany({ where: { scanId: scan.id }, include: { match: true } });
+    expect(saved.map((s) => `${s.match.homeTeam}:${s.marketType}`).sort()).toEqual(["H1:HOME", "H2:AWAY"]);
+    const s = await db.robotScan.findUniqueOrThrow({ where: { id: scan.id } });
+    expect([s.status, s.pairsExcluded, s.selectionsFound]).toEqual(["COMPLETED", 2, 2]);
+    const log = (s.diagnostics as { ruleLog: { kept: string[] }[] }).ruleLog;
+    expect(log.map((l) => l.kept)).toEqual([["1"], ["2"]]);
+    vi.restoreAllMocks();
+  });
+});
