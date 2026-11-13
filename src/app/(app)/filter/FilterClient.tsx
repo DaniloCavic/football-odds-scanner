@@ -37,7 +37,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return j as T;
 }
 
-export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto[]; scans: ScanStatusDto[] }) {
+export function FilterClient({ initialSets, scans, combineEnabled = true }: { initialSets: FilterSetDto[]; scans: ScanStatusDto[]; combineEnabled?: boolean }) {
   const [sets, setSets] = useState(initialSets);
   const [setId, setSetId] = useState<string | null>(initialSets[0]?.id ?? null);
   const [entries, setEntries] = useState<FilterEntryDto[]>([]);
@@ -270,8 +270,13 @@ export function FilterClient({ initialSets, scans }: { initialSets: FilterSetDto
                   <input value={maxOdds} onChange={(e) => setMaxOdds(e.target.value)} placeholder="do" aria-label="Kvota do" inputMode="decimal" className={`${inputCls} w-full`} />
                 </div>
               </div>
-              {candidates.length > 0 && (
+              {candidates.length > 0 ? (
                 <ComboCandidates candidates={candidates} inFilter={inFilter} now={now} onAdd={addCombo} />
+              ) : (
+                <p className="mb-3 rounded-lg border border-line px-3 py-2 text-xs text-muted" data-testid="no-candidates">
+                  Spojeni tipovi (ručni unos): u ovom skeniranju nema kandidata.
+                  {combineEnabled ? " Nijedna utakmica nije imala 1/2 + jedan tip golova do 1.30." : <> Spajanje je <b className="text-live">isključeno</b> u Podešavanjima („Spoji 1/2 i tip golova“) – uključi ga i ponovo pokreni robota.</>}
+                </p>
               )}
               {(() => {
                 const addable = filtered.filter((s) => !inFilter.has(`${s.matchId}|${s.marketType}`) && new Date(s.kickoffTime).getTime() > now);
