@@ -47,6 +47,8 @@ model Settings {
   maxRequestsPerScan         Int      @default(60)
   /// Result Tracker: najmanji razmak (min) između dve provere istog dana kod API-Football-a
   resultCheckMinutes         Int      @default(15)
+  /// Result Tracker: najviše API-Football zahteva dnevno (Pro paket: 7.500/dan)
+  apiFootballDailyCap        Int      @default(200)
   /// Result Tracker: koliko OddsPapi provera rezultata dnevno (rezervni izvor)
   oddsPapiResultChecksPerDay Int      @default(10)
   /// Pravilo: ako su za istu utakmicu i 2+ i 0–3 do maks. kvote, izbacuju se oba tipa

@@ -18,5 +18,6 @@ export async function runTrackerNow(): Promise<TrackerReport> {
     oddsPapi: client ? (id) => fetchOddsPapiResult(client, id) : null,
     resultCheckMinutes: settings.resultCheckMinutes,
     oddsPapiChecksPerDay: settings.oddsPapiResultChecksPerDay,
+    apiFootballDailyCap: settings.apiFootballDailyCap,
   });
 }

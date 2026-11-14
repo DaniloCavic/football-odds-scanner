@@ -10,6 +10,7 @@ export async function getSettings() {
     timezone: s.timezone,
     maxRequestsPerScan: s.maxRequestsPerScan,
     resultCheckMinutes: s.resultCheckMinutes,
+    apiFootballDailyCap: s.apiFootballDailyCap,
     oddsPapiResultChecksPerDay: s.oddsPapiResultChecksPerDay,
     excludeGoalsPair: s.excludeGoalsPair,
     combineResultGoals: s.combineResultGoals,

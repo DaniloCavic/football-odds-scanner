@@ -14,7 +14,7 @@ export const EXPECTED_END_MIN = 110;
 const FALLBACK_AFTER_MIN = 150;
 const REVIEW_AFTER_H = 36;
 const GIVE_UP_DAYS = 3;
-const AF_DAILY_CAP = 90;
+const AF_DAILY_CAP_DEFAULT = 200;
 /** Brojač uspešnih API-Football zahteva (v2: neuspeli se više ne broje). */
 const AF_COUNTER = "apifootball-ok";
 
@@ -27,6 +27,8 @@ export type TrackerDeps = {
   oddsPapi: ((fixtureId: string) => Promise<OpResponse>) | null;
   resultCheckMinutes: number;
   oddsPapiChecksPerDay: number;
+  /** Najviše API-Football zahteva dnevno (podešavanje). */
+  apiFootballDailyCap?: number;
 };
 
 export type TrackerReport = {
@@ -74,6 +76,7 @@ function demoScore(externalId: string) {
 export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
   const { db } = deps;
   const now = deps.now ?? new Date();
+  const afCap = deps.apiFootballDailyCap ?? AF_DAILY_CAP_DEFAULT;
   const report: TrackerReport = { at: now.toISOString(), matches: 0, settled: 0, live: 0, postponed: 0, needsReview: 0, apiFootballCalls: 0, oddsPapiCalls: 0, errors: [] };
 
   if (!(await tryLock(db, "tracker", 4 * MIN, now))) return { ...report, skipped: "Druga provera je u toku." };
@@ -162,7 +165,7 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
         const cached = await getState<{ at: string; fixtures: (Omit<AfFixture, "kickoff"> & { kickoff: string })[] } | null>(db, key, null);
         const fresh = cached && now.getTime() - new Date(cached.at).getTime() < deps.resultCheckMinutes * MIN;
         if (fresh) result = cached!.fixtures.map((f) => ({ ...f, kickoff: new Date(f.kickoff) }));
-        else if (!(await afBlocked()) && (await dailyCount(db, AF_COUNTER, now)) < AF_DAILY_CAP) {
+        else if (!(await afBlocked()) && (await dailyCount(db, AF_COUNTER, now)) < afCap) {
           try {
             report.apiFootballCalls++;
             result = await deps.apiFootball(date);
@@ -287,7 +290,7 @@ export async function runTracker(deps: TrackerDeps): Promise<TrackerReport> {
     const afErr = await getState<{ until: string; message: string } | null>(db, "af:error", null).catch(() => null);
     report.sources = {
       apiFootball: {
-        configured: !!deps.apiFootball, usedToday: await dailyCount(db, AF_COUNTER, now).catch(() => 0), cap: AF_DAILY_CAP,
+        configured: !!deps.apiFootball, usedToday: await dailyCount(db, AF_COUNTER, now).catch(() => 0), cap: afCap,
         blockedUntil: afErr && new Date(afErr.until) > now ? afErr.until : null, lastError: afErr?.message ?? null,
       },
       oddsPapi: { configured: !!deps.oddsPapi, usedToday: await dailyCount(db, "oddspapi-results", now).catch(() => 0), budget: deps.oddsPapiChecksPerDay },

@@ -17,6 +17,7 @@ export async function saveSettingsAction(_prev: SettingsState, formData: FormDat
     stakePerSelection: normalizeDecimal(formData.get("stakePerSelection")),
     maxRequestsPerScan: normalizeDecimal(formData.get("maxRequestsPerScan")),
     resultCheckMinutes: normalizeDecimal(formData.get("resultCheckMinutes")),
+    apiFootballDailyCap: normalizeDecimal(formData.get("apiFootballDailyCap")),
     oddsPapiResultChecksPerDay: normalizeDecimal(formData.get("oddsPapiResultChecksPerDay")),
     excludeGoalsPair: formData.get("excludeGoalsPair") === "on",
     combineResultGoals: formData.get("combineResultGoals") === "on",
@@ -26,7 +27,7 @@ export async function saveSettingsAction(_prev: SettingsState, formData: FormDat
 
   const before = await getSettings();
   const next = parsed.data;
-  const keys = ["maxOdds", "stakePerSelection", "maxRequestsPerScan", "resultCheckMinutes", "oddsPapiResultChecksPerDay", "excludeGoalsPair", "combineResultGoals", "comboFallback"] as const;
+  const keys = ["maxOdds", "stakePerSelection", "maxRequestsPerScan", "resultCheckMinutes", "apiFootballDailyCap", "oddsPapiResultChecksPerDay", "excludeGoalsPair", "combineResultGoals", "comboFallback"] as const;
   if (keys.every((k) => before[k] === next[k])) return { ok: true };
 
   await prisma.$transaction([

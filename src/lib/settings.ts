@@ -27,6 +27,7 @@ export const settingsSchema = z.object({
   excludeGoalsPair: z.boolean().default(true),
   combineResultGoals: z.boolean().default(true),
   comboFallback: z.enum(["SKIP", "WINNER_ONLY", "BOTH_SINGLE"]).default("WINNER_ONLY"),
+  apiFootballDailyCap: z.coerce.number({ invalid_type_error: "Limit mora biti broj." }).int("Limit mora biti ceo broj.").min(10, "Najmanje 10.").max(7000, "Najviše 7.000 (Pro paket: 7.500 dnevno)."),
   oddsPapiResultChecksPerDay: z.coerce.number({ invalid_type_error: "Limit mora biti broj." }).int("Limit mora biti ceo broj.").min(0, "Limit ne može biti negativan.").max(200, "Limit je najviše 200."),
 });
 

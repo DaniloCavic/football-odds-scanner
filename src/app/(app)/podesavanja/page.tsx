@@ -15,7 +15,7 @@ export default async function SettingsPage() {
         <div className="space-y-4 lg:col-span-2">
         <Card>
           <h2 className="mb-4 font-semibold">Pravila skeniranja i simulacije</h2>
-          <SettingsForm maxOdds={settings.maxOdds} stake={settings.stakePerSelection} maxRequests={settings.maxRequestsPerScan} checkMinutes={settings.resultCheckMinutes} opChecks={settings.oddsPapiResultChecksPerDay} goalsPair={settings.excludeGoalsPair} combine={settings.combineResultGoals} fallback={settings.comboFallback} />
+          <SettingsForm maxOdds={settings.maxOdds} stake={settings.stakePerSelection} maxRequests={settings.maxRequestsPerScan} checkMinutes={settings.resultCheckMinutes} opChecks={settings.oddsPapiResultChecksPerDay} goalsPair={settings.excludeGoalsPair} combine={settings.combineResultGoals} fallback={settings.comboFallback} afCap={settings.apiFootballDailyCap} />
         </Card>
         <Card>
           <h2 className="mb-4 font-semibold">Promena lozinke</h2>

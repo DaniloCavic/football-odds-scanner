@@ -5,7 +5,7 @@ import { saveSettingsAction, type SettingsState } from "./actions";
 
 const input = "w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/30";
 
-export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChecks, goalsPair, combine, fallback }: { maxOdds: number; stake: number; maxRequests: number; checkMinutes: number; opChecks: number; goalsPair: boolean; combine: boolean; fallback: string }) {
+export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChecks, goalsPair, combine, fallback, afCap }: { maxOdds: number; stake: number; maxRequests: number; checkMinutes: number; opChecks: number; goalsPair: boolean; combine: boolean; fallback: string; afCap: number }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(saveSettingsAction, {});
   return (
     <form action={action} className="space-y-5">
@@ -29,6 +29,11 @@ export function SettingsForm({ maxOdds, stake, maxRequests, checkMinutes, opChec
           <label htmlFor="resultCheckMinutes" className="mb-1.5 block text-sm text-muted">Provera rezultata – interval (min)</label>
           <input id="resultCheckMinutes" name="resultCheckMinutes" inputMode="numeric" defaultValue={checkMinutes} className={input} />
           <p className="mt-1.5 text-xs text-muted">Najmanji razmak između dva API-Football zahteva za isti dan (5–240). Besplatno: 100 zahteva/dan.</p>
+        </div>
+        <div>
+          <label htmlFor="apiFootballDailyCap" className="mb-1.5 block text-sm text-muted">API-Football zahteva dnevno (rezultati)</label>
+          <input id="apiFootballDailyCap" name="apiFootballDailyCap" inputMode="numeric" defaultValue={afCap} className={input} />
+          <p className="mt-1.5 text-xs text-muted">Glavni izvor rezultata. Pro paket ima 7.500 dnevno; 1 zahtev pokriva sve utakmice jednog dana.</p>
         </div>
         <div>
           <label htmlFor="oddsPapiResultChecksPerDay" className="mb-1.5 block text-sm text-muted">OddsPapi provere rezultata dnevno</label>
