@@ -389,3 +389,50 @@ export async function getOddsPapiStatus(apiKey: string, fetchImpl: Fetch = fetch
     hasFootball: sub?.sport_ids ? sub.sport_ids.includes(FOOTBALL_SPORT_ID) : null,
   };
 }
+
+/**
+ * Provera uživo kvota za jednu kladionicu (podrazumevano AdmiralBet).
+ * Troši najviše 3 zahteva: /markets (samo ako nije u kešu), /fixtures (utakmice u toku), /odds (jedna utakmica).
+ * /account ne troši kvotu.
+ */
+export async function checkLiveOdds(apiKey: string, slug = "admiralbet.rs", fetchImpl: Fetch = fetch, client = new OddsPapiClient(apiKey, fetchImpl)) {
+  const acc = await client.get<OddsPapiAccount>("/account", {});
+  const sub = acc.subscriptions?.find((s) => s.is_active) ?? acc.subscriptions?.[0];
+  const subscription = sub?.bookmakers ? (sub.bookmakers[slug] ?? null) : "paket ne ograničava kladionice";
+
+  const now = Date.now();
+  const live = await client.get<OddsPapiFixture[]>("/fixtures", {
+    sportId: FOOTBALL_SPORT_ID, from: iso(new Date(now - 3 * 3600_000)), to: iso(new Date(now + 3600_000)),
+    statusId: 1, hasOdds: true, bookmakers: slug,
+  });
+  const liveFootball = live.filter((f) => f.sportId === FOOTBALL_SPORT_ID);
+  const base = {
+    bookmaker: slug, subscription, requestCount: sub?.request_count ?? null, requestLimit: sub?.request_limit ?? null,
+    liveFixtures: liveFootball.length,
+    liveSample: liveFootball.slice(0, 10).map((f) => ({ fixtureId: f.fixtureId, match: `${f.participant1Name ?? "?"} – ${f.participant2Name ?? "?"}`, competition: [f.categoryName, f.tournamentName].filter(Boolean).join(" · "), startTime: f.startTime })),
+  };
+  if (!liveFootball.length) return { ...base, verdict: "U ovom trenutku nema utakmica u toku sa kvotama ove kladionice. Probaj dok se igraju utakmice." };
+
+  if (!marketsCache || Date.now() - marketsCache.at > 24 * 3600_000) {
+    marketsCache = buildCache(await client.get<OddsPapiMarket[]>("/markets", { language: "en" }));
+  }
+  const pick = liveFootball[0];
+  try {
+    const fx = await client.get<OddsPapiFixture>("/odds", { fixtureId: pick.fixtureId, bookmakers: slug, oddsFormat: "decimal", language: "en" });
+    const book = fx.bookmakerOdds?.[slug];
+    const markets = book?.markets ?? {};
+    const changed = Object.values(markets).flatMap((m) => Object.values(m.outcomes ?? {}).map((o) => o.players?.["0"]?.changedAt)).filter(Boolean).sort() as string[];
+    const odds = extractOdds(fx, marketsCache.map, slug);
+    return {
+      ...base,
+      checkedFixture: { ...base.liveSample[0], statusId: fx.statusId },
+      bookmakerPresent: !!book, suspended: book?.suspended ?? null, marketCount: Object.keys(markets).length,
+      odds: Object.fromEntries(Object.entries(odds).map(([k, v]) => [k, v!.price])),
+      lastChangedAt: changed.at(-1) ?? null, checkedAt: new Date().toISOString(),
+      verdict: book && Object.keys(markets).length ? "DA – OddsPapi vraća uživo kvote ove kladionice." : "Utakmica je u toku, ali kladionica nema kvote u odgovoru.",
+    };
+  } catch (e) {
+    if (e instanceof ProviderError) return { ...base, verdict: `Utakmice u toku postoje, ali /odds je odbijen: ${e.message}` };
+    throw e;
+  }
+}
