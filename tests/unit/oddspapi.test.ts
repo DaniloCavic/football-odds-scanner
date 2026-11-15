@@ -145,7 +145,7 @@ describe("OddsPapi – klijent", () => {
     await expect(bad.get("/sports", {})).rejects.toBeInstanceOf(ProviderError);
     await expect(bad.get("/sports", {})).rejects.toThrow(/ključ/);
     const forb = new OddsPapiClient("k", mockFetch(() => ({ status: 403, body: { code: "RESTRICTED_ACCESS", details: "bookmaker not in plan" } })).fn, 0, noSleep);
-    await expect(forb.get("/odds", {})).rejects.toThrow(/SoccerBet RS/);
+    await expect(forb.get("/odds", {})).rejects.toThrow(/ne uključuje ovu kladionicu/);
   });
 });
 
