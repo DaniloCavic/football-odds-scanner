@@ -197,6 +197,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
           <div className="space-y-3">
             <SourceBox source={source} maxRequests={maxRequests} />
             {source?.configured && source.ok && <CompareBox />}
+            {source?.configured && source.ok && <LiveCheckBox />}
           </div>
         </div>
 
@@ -516,6 +517,48 @@ function CompareBox() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type LiveCheck = {
+  verdict?: string; error?: string; liveFixtures?: number; marketCount?: number; lastChangedAt?: string | null; checkedAt?: string;
+  checkedFixture?: { match: string; competition: string }; odds?: Record<string, number>;
+};
+
+/** Provera da li OddsPapi vraća uživo kvote AdmiralBet-a (najviše 3 zahteva). */
+function LiveCheckBox() {
+  const [data, setData] = useState<LiveCheck | null>(null);
+  const [raw, setRaw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  async function run() {
+    setBusy(true); setCopied(false);
+    try {
+      const r = await fetch("/api/robot/live-check", { cache: "no-store" });
+      const j = await r.json();
+      setData(j); setRaw(JSON.stringify(j, null, 2));
+    } catch { setData({ error: "Provera nije uspela." }); setRaw(""); } finally { setBusy(false); }
+  }
+  return (
+    <div className="rounded-xl border border-line bg-panel-2/50 p-4 text-sm">
+      <h3 className="mb-1 font-semibold">Proveri uživo kvote</h3>
+      <p className="mb-3 text-xs text-muted">Da li OddsPapi daje AdmiralBet kvote za utakmice koje su u toku. Pokreni dok se igraju utakmice. Troši najviše 3 zahteva.</p>
+      <button type="button" onClick={run} disabled={busy} className="rounded-lg border border-accent/50 px-3 py-1.5 text-accent hover:bg-accent/10 disabled:opacity-50">
+        {busy ? "Proveravam…" : "Proveri uživo"}
+      </button>
+      {data && (
+        <div className="mt-3 space-y-2">
+          <p className={data.error ? "text-lost" : "font-medium"}>{data.error ?? data.verdict}</p>
+          {data.liveFixtures !== undefined && <p className="text-xs text-muted">Utakmica u toku sa AdmiralBet kvotama: {data.liveFixtures}</p>}
+          {data.checkedFixture && <p className="text-xs text-muted">Provereno: {data.checkedFixture.match} ({data.checkedFixture.competition}) · tržišta: {data.marketCount}{data.odds && Object.keys(data.odds).length ? " · " + Object.entries(data.odds).map(([k, v]) => `${TYPE_LABEL[k] ?? k} ${v.toFixed(2)}`).join(", ") : ""}</p>}
+          {raw && (
+            <button type="button" onClick={() => navigator.clipboard?.writeText(raw).then(() => setCopied(true))} className="rounded-lg border border-line px-3 py-1.5 text-xs hover:bg-panel-2">
+              {copied ? "Kopirano" : "Kopiraj ceo rezultat"}
+            </button>
+          )}
         </div>
       )}
     </div>
