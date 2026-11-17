@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/session";
-import { computeCandidateStats, computeStats, computeStrategies } from "@/lib/stats/compute";
-import { loadCandidateRows, loadStatRows } from "@/lib/stats/load";
+import { computeStats, computeStrategies } from "@/lib/stats/compute";
+import { loadStatRows } from "@/lib/stats/load";
 import { addDays, parseYmd, zonedMidnight } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +24,6 @@ export async function GET(req: Request) {
   const from = f ? zonedMidnight(f) : null;
   const to = t ? zonedMidnight(addDays(t, 1)) : null;
   const includeDemo = p.data.demo === "1";
-  const [rows, cands] = await Promise.all([
-    loadStatRows({ from, to, scope: p.data.scope, includeDemo, filterSetId: p.data.filterSet || null }),
-    loadCandidateRows({ from, to, includeDemo }),
-  ]);
-  return Response.json({ ...computeStats(rows, p.data.granularity), strategies: computeStrategies(rows), candidates: computeCandidateStats(cands) });
+  const rows = await loadStatRows({ from, to, scope: p.data.scope, includeDemo, filterSetId: p.data.filterSet || null });
+  return Response.json({ ...computeStats(rows, p.data.granularity), strategies: computeStrategies(rows) });
 }

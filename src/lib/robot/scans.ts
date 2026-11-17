@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { MARKET_LABELS, type MarketTypeCode } from "@/lib/odds";
+import { MARKET_LABELS, MARKET_TYPES, type MarketTypeCode } from "@/lib/odds";
 import { providerName } from "./providers";
 
 export async function getScanStatus(id: string) {
@@ -22,9 +22,6 @@ export async function getScanStatus(id: string) {
     fixturesTotal: s.fixturesTotal,
     fixturesScanned: s.fixturesScanned,
     fixturesExcluded: s.fixturesExcluded,
-    pairsExcluded: s.pairsExcluded,
-    comboSkipped: s.comboSkipped,
-    combosCreated: s.combosCreated,
     selectionsFound: s.selectionsFound,
     requestsUsed: s.requestsUsed,
     errors: Array.isArray(s.errors) ? (s.errors as string[]) : [],
@@ -34,8 +31,6 @@ export async function getScanStatus(id: string) {
       bookmakerMarkets?: { id: string; count: number; name: string }[];
       marketMap?: Record<string, string[]>;
       rawSamples?: Record<string, unknown>;
-      ruleLog?: { match: string; found: string[]; kept: string[]; note: string }[];
-      comboCatalog?: { id: number; name: string; outcomes: string[]; offeredByBookmaker: number }[];
     },
   };
 }
@@ -43,7 +38,8 @@ export type ScanStatusDto = NonNullable<Awaited<ReturnType<typeof getScanStatus>
 
 export async function getScanSelections(scanId: string) {
   const rows = await prisma.marketSelection.findMany({
-    where: { scanId, excludedReason: null },
+    // samo 1 i 2 – stara skeniranja mogu imati i 2+, 0–3 i spojene tipove
+    where: { scanId, excludedReason: null, marketType: { in: [...MARKET_TYPES] } },
     include: { match: true },
     orderBy: [{ match: { kickoffTime: "asc" } }, { marketType: "asc" }],
   });

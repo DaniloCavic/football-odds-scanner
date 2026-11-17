@@ -27,31 +27,17 @@ Soccerbet nema javni API, a scraping njihovog sajta ne koristimo. Kvote dolaze p
 - Svako skeniranje čuva nove zapise kvota sa vremenom i izvorom, a stare nikada ne prepisuje.
 - Bez ključa radi samo **DEMO** izvor (izmišljene utakmice, jasno označene).
 
-## Pravilo „2+ i 0–3 zajedno“
-Ako su za istu utakmicu i 2+ i 0–3 do maks. kvote, robot ne čuva nijedan od ta dva tipa, a 1 i 2 iste utakmice ostaju. Takva utakmica je praktično igra na „2 ili 3 gola“.
-- Pravilo se uključuje i isključuje u Podešavanjima i podrazumevano je uključeno.
-- Na stara skeniranja primenjuje se pri pokretanju servera (`retroExcludeGoalsPairs`, idempotentno):
-  - takvi tipovi dobijaju `excludedReason = GOALS_PAIR`
-  - njihovi zapisi u filterima se uklanjaju iz prikaza i statistike
-  - brojke skeniranja se preračunavaju, a promena ide u audit log
-- U istom filteru se ne može dodati suprotan tip golova za utakmicu koja već ima jedan.
-
-## Pravilo spajanja „ishod + golovi“
-Ako su za istu utakmicu do maks. kvote **1 (ili 2) i tačno jedan tip golova** (2+ ili 0–3), igra se **spojeni tip** („1&2+“, „1&0–3“, „2&2+“, „2&0–3“):
-- Kvota je ona koju za taj spojeni tip daje kladionica, bez ograničenja kvote.
-- **Ako izvor nema kvotu spojenog tipa, cela utakmica se preskače.**
-- Kad su sva tri tipa do maks. kvote (1 + 2+ + 0–3), igra se samo 1 (ili 2).
-- Spojeni tip prolazi samo ako prođu oba dela.
-- U statistici spojeni tipovi imaju svoje redove i grupu.
-- Pravilo se uključuje i isključuje u Podešavanjima.
-- Nijedan API ne prenosi srpske „Kombinacije“, pa robot pravi **kandidata** (`ComboCandidate`) sa kvotama oba dela.
-- Na stranici Filter korisnik unese kvotu sa AdmiralBet-a („Kombinacije“), a aplikacija sačuva spojeni tip (`manualOdds`). On zamenjuje pojedinačne tipove te utakmice u filteru.
-- Statistika → **Strategije** poredi pristupe na istim tipovima. Tabela **„Spojeni tipovi – svi kandidati (virtuelno)“** pokazuje prolaznost spojenog tipa i potrebnu kvotu za plus, i poređenje sa igranjem samo 1/2 ili samo golova. Rezultate kandidata tracker uzima iz istog dnevnog API-Football odgovora, bez dodatnih zahteva.
+## Samo pobednik meča (od 18.11.2026.)
+Robot traži samo **1 i 2** (pobednik meča) sa kvotom do maks. kvote (≤ 1.30). Sve lige ostaju.
+- Tipovi 2+, 0–3 i spojeni tipovi („1&2+“…) se više ne traže, ne mogu u filter i ne ulaze u statistiku.
+- Pravila za golove, spajanje i ručni unos spojenih kvota su uklonjena (tabela `ComboCandidate` i njihova podešavanja su obrisani migracijom `samo_pobednik`).
+- Završeni stari tipovi ostaju u bazi kao istorija (vide se u CSV/JSON izvozu). Neobračunati stari tipovi su migracijom uklonjeni iz filtera.
+- Tracker i dalje ume da obračuna stare tipove (`settle-math.ts`), zbog zapisa koji su ostali u bazi.
 
 ## Filter (faza 3)
 - Imenovani filteri (FilterSet) sa ulogom po tipu (podrazumevano 1.000 RSD iz Podešavanja).
 - Tip se dodaje prevlačenjem ili dugmetom +. U bazi se čuva odmah, sa nepromenljivim snimkom kvote i uloga.
-- Isti tip iste utakmice ne može dvaput u isti filter (unique + serializable transakcija). Različiti tipovi iste utakmice mogu.
+- Isti tip iste utakmice ne može dvaput u isti filter (unique + serializable transakcija). U filter mogu samo tipovi 1 i 2.
 - Uklanjanje, čišćenje i brisanje su "meki": zapis ostaje za statistiku. Čišćenje i brisanje se beleže u AuditLog.
 - Utakmica koja je počela ne može da se doda. Pravilo kvote se ponovo proverava na serveru.
 

@@ -1,21 +1,14 @@
 import { ABSOLUTE_MAX_ODDS } from "./settings";
 
-/** Tipovi koje robot traži: 1, 2, 2+, 0–3. (X se ne prati – odluka korisnika.) */
-export const MARKET_TYPES = ["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"] as const;
-/** Spojeni tipovi „ishod + golovi“ – jedno tržište kladionice (npr. „1&2+“). Bez ograničenja kvote. */
-export const COMBO_TYPES = ["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"] as const;
-export type ComboTypeCode = (typeof COMBO_TYPES)[number];
-/** Svi tipovi koji mogu postojati u bazi (DRAW ostaje samo zbog starih zapisa). */
-export type MarketTypeCode = (typeof MARKET_TYPES)[number] | ComboTypeCode | "DRAW";
-
-/** Od kojih delova se sastoji spojeni tip. */
-export const COMBO_PARTS: Record<ComboTypeCode, ["HOME" | "AWAY", "OVER_1_5" | "UNDER_3_5"]> = {
-  HOME_OVER_1_5: ["HOME", "OVER_1_5"],
-  HOME_UNDER_3_5: ["HOME", "UNDER_3_5"],
-  AWAY_OVER_1_5: ["AWAY", "OVER_1_5"],
-  AWAY_UNDER_3_5: ["AWAY", "UNDER_3_5"],
-};
-export const isCombo = (t: string): t is ComboTypeCode => (COMBO_TYPES as readonly string[]).includes(t);
+/** Tipovi koje robot traži: samo pobednik meča – 1 i 2 (kvota do 1.30). */
+export const MARKET_TYPES = ["HOME", "AWAY"] as const;
+export type ActiveMarketType = (typeof MARKET_TYPES)[number];
+export const isActiveType = (t: string): t is ActiveMarketType => (MARKET_TYPES as readonly string[]).includes(t);
+/**
+ * Svi tipovi koji mogu postojati u bazi. 2+, 0–3, spojeni tipovi i X se više ne traže –
+ * ostaju samo zbog starih zapisa (istorija, CSV izvoz).
+ */
+export type MarketTypeCode = ActiveMarketType | "DRAW" | "OVER_1_5" | "UNDER_3_5" | "HOME_OVER_1_5" | "HOME_UNDER_3_5" | "AWAY_OVER_1_5" | "AWAY_UNDER_3_5";
 
 export const MARKET_LABELS: Record<MarketTypeCode, string> = {
   HOME: "1",

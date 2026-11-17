@@ -2,9 +2,8 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { log } from "@/lib/log";
-import { COMBO_PARTS, COMBO_TYPES, isCombo, isValidOdds, MARKET_LABELS, MARKET_TYPES, type ComboTypeCode, type MarketTypeCode } from "@/lib/odds";
+import { isValidOdds, MARKET_TYPES } from "@/lib/odds";
 import { isRealFootball } from "./football";
-import { applyMatchRules, type ComboFallback } from "./rules";
 import { getProvider } from "./providers";
 import { ProviderError, RequestLimitReached, type ScanContext } from "./types";
 
@@ -37,7 +36,6 @@ export async function runScan(scanId: string): Promise<void> {
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
 
   const diag: Record<string, unknown> = {};
-  const ruleLog: { match: string; found: string[]; kept: string[]; note: string }[] = [];
   const priceCounts: Record<string, { total: number; valid: number; min: number | null }> = {};
   for (const m of MARKET_TYPES) priceCounts[m] = { total: 0, valid: 0, min: null };
   let lastStopCheck = 0;
@@ -80,37 +78,11 @@ export async function runScan(scanId: string): Promise<void> {
         priceCounts[m].total += 1;
         priceCounts[m].min = priceCounts[m].min == null ? p : Math.min(priceCounts[m].min!, p);
       }
-      const rawValid = MARKET_TYPES.filter((m) => fx.odds[m] && isValidOdds(fx.odds[m]!.price, maxOdds));
-      for (const m of rawValid) priceCounts[m].valid += 1;
-      const combosAvail: Partial<Record<ComboTypeCode, number>> = {};
-      for (const c of COMBO_TYPES) if (fx.odds[c]) combosAvail[c] = fx.odds[c]!.price;
-      const rule = applyMatchRules(rawValid, combosAvail, {
-        excludeGoalsPair: settings?.excludeGoalsPair ?? true,
-        combineResultGoals: settings?.combineResultGoals ?? true,
-        comboFallback: (settings?.comboFallback as ComboFallback | undefined) ?? "WINNER_ONLY",
-      });
-      const valid: MarketTypeCode[] = [...rule.singles, ...(rule.combo ? [rule.combo] : [])];
-      if ((rule.pairExcluded || rule.comboMissing || rule.combo) && ruleLog.length < 300) {
-        ruleLog.push({
-          match: `${fx.homeTeam} – ${fx.awayTeam}`,
-          found: rawValid.map((m) => `${MARKET_LABELS[m]} @ ${fx.odds[m]!.price.toFixed(2)}`),
-          kept: valid.map((m) => `${MARKET_LABELS[m]}${isCombo(m) ? ` @ ${fx.odds[m]!.price.toFixed(2)}` : ""}`),
-          note: [rule.pairExcluded ? "2+ i 0–3 zajedno → izbačeni" : null, rule.combo ? "spojeni tip po kvoti izvora" : null,
-            rule.comboMissing ? `nema kvote za ${MARKET_LABELS[rule.wanted!]} → kandidat za ručni unos` : null].filter(Boolean).join("; "),
-        });
-      }
-      if (rule.pairExcluded || rule.comboMissing || rule.combo) {
-        await prisma.robotScan.update({
-          where: { id: scanId },
-          data: {
-            pairsExcluded: { increment: rule.pairExcluded ? 1 : 0 },
-            comboSkipped: { increment: rule.comboMissing ? 1 : 0 },
-            combosCreated: { increment: rule.combo ? 1 : 0 },
-          },
-        });
-      }
+      // Samo pobednik meča: 1 i/ili 2 sa kvotom do maks. kvote (≤ 1.30)
+      const valid = MARKET_TYPES.filter((m) => fx.odds[m] && isValidOdds(fx.odds[m]!.price, maxOdds));
+      for (const m of valid) priceCounts[m].valid += 1;
       let created = 0;
-      if (valid.length || rule.wanted) {
+      if (valid.length) {
         const match = await prisma.match.upsert({
           where: { provider_externalId: { provider: provider.matchNamespace ?? provider.id, externalId: fx.externalId } },
           create: {
@@ -128,15 +100,6 @@ export async function runScan(scanId: string): Promise<void> {
           skipDuplicates: true,
         });
         created = res.count;
-        // kandidat za ručni unos spojene kvote („1&2+“ …)
-        if (rule.wanted) {
-          const [w, g] = COMBO_PARTS[rule.wanted];
-          await prisma.comboCandidate.upsert({
-            where: { scanId_matchId: { scanId, matchId: match.id } },
-            create: { scanId, matchId: match.id, comboType: rule.wanted, winnerOdds: fx.odds[w]!.price, goalsOdds: fx.odds[g]!.price, source: provider.sourceLabel },
-            update: {},
-          });
-        }
       }
       await prisma.robotScan.update({
         where: { id: scanId },
@@ -157,6 +120,6 @@ export async function runScan(scanId: string): Promise<void> {
   }
   await prisma.robotScan.update({
     where: { id: scanId },
-    data: { status: finalStatus, finishedAt: new Date(), diagnostics: JSON.parse(JSON.stringify({ priceCounts, ...diag, ruleLog })) },
+    data: { status: finalStatus, finishedAt: new Date(), diagnostics: JSON.parse(JSON.stringify({ priceCounts, ...diag })) },
   });
 }

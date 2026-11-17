@@ -12,9 +12,6 @@ export async function getSettings() {
     resultCheckMinutes: s.resultCheckMinutes,
     apiFootballDailyCap: s.apiFootballDailyCap,
     oddsPapiResultChecksPerDay: s.oddsPapiResultChecksPerDay,
-    excludeGoalsPair: s.excludeGoalsPair,
-    combineResultGoals: s.combineResultGoals,
-    comboFallback: s.comboFallback as "SKIP" | "WINNER_ONLY" | "BOTH_SINGLE",
     updatedAt: s.updatedAt,
   };
 }

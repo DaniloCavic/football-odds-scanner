@@ -44,31 +44,28 @@ const withOdds = (f: OddsPapiFixture): OddsPapiFixture => ({
 });
 
 describe("OddsPapi – mapiranje tržišta", () => {
-  it("prepoznaje 1/X/2, više od 1.5 i manje od 3.5 (pun meč)", () => {
+  it("prepoznaje samo 1 i 2 (pun meč) – golovi se više ne traže", () => {
     expect(resolveOutcomeMap(MARKETS)).toEqual({
       HOME: [{ marketId: "101", outcomeId: "101" }],
       AWAY: [{ marketId: "101", outcomeId: "103" }],
-      OVER_1_5: [{ marketId: "1010", outcomeId: "1010" }],
-      UNDER_3_5: [{ marketId: "1014", outcomeId: "1015" }],
     });
   });
 
   it("više kandidata za isto tržište: uzima onaj koji Soccerbet ima", () => {
-    const extra: OddsPapiMarket = { marketId: 9015, marketName: "Over Under Full Time", marketType: "totals", period: "fulltime", handicap: 1.5, playerProp: false, sportId: 10,
-      outcomes: [{ outcomeId: 9016, outcomeName: "Over" }, { outcomeId: 9017, outcomeName: "Under" }] };
+    const extra: OddsPapiMarket = { marketId: 9015, marketName: "Match Winner", marketType: "1x2", period: "fulltime", handicap: 0, playerProp: false, sportId: 10,
+      outcomes: [{ outcomeId: 9016, outcomeName: "1" }, { outcomeId: 9017, outcomeName: "X" }, { outcomeId: 9018, outcomeName: "2" }] };
     const map = resolveOutcomeMap([...MARKETS, extra]);
-    expect(map.OVER_1_5).toHaveLength(2);
+    expect(map.HOME).toHaveLength(2);
     const f = fixture("x", 1);
     f.bookmakerOdds = { "soccerbet.rs": { markets: { "9015": { outcomes: { "9016": price(1.22) } } } } };
-    expect(extractOdds(f, map).OVER_1_5?.price).toBe(1.22);
+    expect(extractOdds(f, map).HOME?.price).toBe(1.22);
   });
 
   it("izvlači kvote Soccerbet-a, preskače neaktivne i suspendovane", () => {
     const map = resolveOutcomeMap(MARKETS);
     const odds = extractOdds(withOdds(fixture("a", 1)), map);
     expect(odds.HOME?.price).toBe(1.25);
-    expect(odds.OVER_1_5?.price).toBe(1.18);
-    expect(odds.UNDER_3_5?.price).toBe(1.31);
+    expect(odds.OVER_1_5).toBeUndefined(); // golovi se ne izvlače
     expect(odds.HOME?.changedAt.toISOString()).toBe("2026-11-09T20:00:00.000Z");
 
     const susp = withOdds(fixture("b", 1));
@@ -208,7 +205,7 @@ describe("OddsPapi – druga kladionica", () => {
       if (url.pathname === "/v4/fixtures") body = [fixture("m1", 7)];
       if (url.pathname === "/v4/odds-by-tournaments") {
         const f = fixture("m1", 7);
-        f.bookmakerOdds = { "maxbet.rs": { markets: { "1010": { outcomes: { "1010": price(1.2) } }, "1014": { outcomes: { "1015": price(1.28) } } } } };
+        f.bookmakerOdds = { "maxbet.rs": { markets: { "101": { outcomes: { "101": price(1.2), "103": price(1.28) } } } } };
         body = [f];
       }
       return new Response(JSON.stringify(body), { status: 200 });
@@ -220,33 +217,28 @@ describe("OddsPapi – druga kladionica", () => {
     for await (const f of provider.scan({ from: new Date("2026-11-10T00:00:00Z"), to: new Date("2026-11-11T00:00:00Z") }, ctx())) out.push(f);
     expect(calls.find((u) => u.pathname === "/v4/fixtures")!.searchParams.get("bookmakers")).toBe("maxbet.rs");
     expect(calls.find((u) => u.pathname === "/v4/odds-by-tournaments")!.searchParams.get("bookmaker")).toBe("maxbet.rs");
-    expect(out[0].odds.OVER_1_5?.price).toBe(1.2);
-    expect(out[0].odds.UNDER_3_5?.price).toBe(1.28);
+    expect(out[0].odds.HOME?.price).toBe(1.2);
+    expect(out[0].odds.AWAY?.price).toBe(1.28);
   });
 });
 
-describe("OddsPapi – 2+ i 0–3 u svim oblicima", () => {
+describe("OddsPapi – tržišta golova se ignorišu", () => {
   const m = (id: number, name: string, type: string, handicap: number, outcomes: string[], period = "fulltime"): OddsPapiMarket => ({
     marketId: id, marketName: name, marketType: type, period, handicap, playerProp: false, sportId: 10,
     outcomes: outcomes.map((n, i) => ({ outcomeId: id * 10 + i, outcomeName: n })),
   });
-  it("prepoznaje Over 1.5 bez para Under, ishode '2+'/'0-3' i Da/Ne tržišta", () => {
+  it("Over/Under, opsezi golova i spojena tržišta ne ulaze u mapiranje", () => {
     const map = resolveOutcomeMap([
-      m(108, "Over Under Full Time", "totals", 1.5, ["Over"]),
+      m(108, "Over Under Full Time", "totals", 1.5, ["Over", "Under"]),
       m(500, "Total Goals Range", "goalrange", 0, ["0-1", "2+", "0-3", "4+"]),
-      m(501, "Over 1.5 Goals", "yesno", 0, ["Yes", "No"]),
-      m(502, "Under 3.5 Goals", "yesno", 0, ["Yes", "No"]),
-      m(503, "Over Under First Half", "totals", 1.5, ["Over", "Under"], "p1"),
-      m(504, "Home Team Over Under", "totals", 1.5, ["Over", "Under"]),
+      m(600, "1X2 & Over Under", "combo", 1.5, ["1 & Over 1.5", "2 & Under 3.5"]),
     ]);
-    const keys = (t: keyof typeof map) => map[t]!.map((r) => `${r.marketId}/${r.outcomeId}`);
-    expect(keys("OVER_1_5")).toEqual(["108/1080", "500/5001", "501/5010"]);
-    expect(keys("UNDER_3_5")).toEqual(["500/5002", "502/5020"]);
+    expect(map).toEqual({});
   });
 });
 
 describe("OddsPapi – poređenje kladionica", () => {
-  it("jedan /odds zahtev za sve kladionice, MaxBet bez 2+ (samo 0–1)", async () => {
+  it("jedan /odds zahtev za sve kladionice, samo kvote 1 i 2", async () => {
     const calls: URL[] = [];
     const fn = (async (input: URL | RequestInfo) => {
       const url = new URL(String(input));
@@ -255,7 +247,7 @@ describe("OddsPapi – poređenje kladionica", () => {
       const f = fixture("c1", 1);
       f.bookmakerOdds = {
         "maxbet.rs": { markets: { "101": { outcomes: { "101": price(1.2) } }, "1010": { outcomes: { "1011": price(3.7) } } } },
-        "mozzartbet": { markets: { "1010": { outcomes: { "1010": price(1.22) } } } },
+        "mozzartbet": { markets: { "101": { outcomes: { "103": price(1.22) } } } },
       };
       return new Response(JSON.stringify(f));
     }) as unknown as typeof fetch;
@@ -265,7 +257,7 @@ describe("OddsPapi – poređenje kladionica", () => {
     expect(odds[0].searchParams.get("bookmakers")).toContain("maxbet.rs");
     const maxbet = r.bookmakers.find((b) => b.slug === "maxbet.rs")!;
     expect(maxbet.odds).toEqual({ HOME: 1.2 });
-    expect(r.bookmakers.find((b) => b.slug === "mozzartbet")!.odds.OVER_1_5).toBe(1.22);
+    expect(r.bookmakers.find((b) => b.slug === "mozzartbet")!.odds.AWAY).toBe(1.22);
     expect(r.bookmakers.find((b) => b.slug === "soccerbet.rs")!.present).toBe(false);
   });
 });

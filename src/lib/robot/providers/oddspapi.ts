@@ -77,36 +77,6 @@ export function resolveOutcomeMap(markets: OddsPapiMarket[]): OutcomeMap {
     add("HOME", m, /^1$/);
     add("AWAY", m, /^2$/);
   }
-  // 1) Klasično: "Over Under" sa granicom 1.5 (Over = 2+) i 3.5 (Under = 0–3)
-  const totals = (line: number) => ft.filter((m) => m.marketType === "totals" && Math.abs(m.handicap - line) < 1e-9
-    && !EXCLUDED_TOTALS.test(m.marketName));
-  for (const m of totals(1.5)) add("OVER_1_5", m, /^(over|over\s*1\.5|\+1\.5)$/i);
-  for (const m of totals(3.5)) add("UNDER_3_5", m, /^(under|under\s*3\.5|-3\.5)$/i);
-  // 2) Tržišta gde je sam ishod "2+" ili "0–3" (opsezi golova, "ukupno golova")
-  const goalish = ft.filter((m) => !EXCLUDED_TOTALS.test(m.marketName) && /(goal|total|range|over|under|ukupno)/i.test(`${m.marketName} ${m.marketType}`));
-  for (const m of goalish) {
-    add("OVER_1_5", m, /^(2\+|2\s*\+\s*goals?|2 or more( goals)?|2 and more|at least 2( goals)?|over 1\.5( goals)?|2-\+|2\s*-\s*more)$/i);
-    add("UNDER_3_5", m, /^(0\s*[-–]\s*3( goals)?|0 to 3( goals)?|3 or (less|fewer)( goals)?|under 3\.5( goals)?|max(imum)? 3)$/i);
-  }
-  // 3) Da/Ne tržišta tipa "2+ goals" / "Over 1.5 goals"
-  for (const m of goalish) {
-    if (/(2\+|over\s*1\.5|two or more|at least 2)/i.test(m.marketName)) add("OVER_1_5", m, /^yes$/i);
-    if (/(0\s*[-–]\s*3|under\s*3\.5|3 or (less|fewer))/i.test(m.marketName)) add("UNDER_3_5", m, /^yes$/i);
-  }
-  // 4) Spojena tržišta „ishod + golovi“ (npr. „1 & Over 1.5“, „Home and Under 3.5“)
-  for (const m of ft) {
-    if (!/(result|1x2|winner|match).*(total|goal|over|under)|&/i.test(`${m.marketName} ${m.marketType}`) || /half|corner|card|booking|team 1|team 2/i.test(m.marketName)) continue;
-    for (const o of m.outcomes) {
-      const n = o.outcomeName.toLowerCase();
-      const side = /^(1|home)\b/.test(n) ? "HOME" : /^(2|away)\b/.test(n) ? "AWAY" : null;
-      const dir = /over|\+|više|vise/.test(n) ? "OVER" : /under|manje|0\s*[-–]\s*3/.test(n) ? "UNDER" : null;
-      const lineInName = n.match(/(\d)[.,]5/)?.[0]?.replace(",", ".");
-      const line = lineInName ? Number(lineInName) : /2\+/.test(n) ? 1.5 : /0\s*[-–]\s*3/.test(n) ? 3.5 : m.handicap;
-      if (!side || !dir) continue;
-      const type = dir === "OVER" && Math.abs(line - 1.5) < 1e-9 ? `${side}_OVER_1_5` : dir === "UNDER" && Math.abs(line - 3.5) < 1e-9 ? `${side}_UNDER_3_5` : null;
-      if (type) (map[type as MarketTypeCode] ??= []).push({ marketId: String(m.marketId), outcomeId: String(o.outcomeId) });
-    }
-  }
   // bez duplikata
   for (const k of Object.keys(map) as MarketTypeCode[]) {
     const seen = new Set<string>();
@@ -208,10 +178,8 @@ export class OddsPapiClient {
   }
 }
 
-type MarketsCache = { at: number; map: OutcomeMap; names: Map<string, string>; outcomeNames: Map<string, string>; combos: { id: number; name: string; outcomes: string[] }[] };
+type MarketsCache = { at: number; map: OutcomeMap; names: Map<string, string>; outcomeNames: Map<string, string> };
 
-/** Spojena tržišta „ishod + golovi“ u OddsPapi katalogu (npr. „1 & Over 1.5“). */
-const COMBO = /(&|\band\b|\+).*(over|under|total|goal)|(result|1x2|winner|match).*(total|over|under|goals)|(total|over|under|goals).*(result|1x2|winner)/i;
 let marketsCache: MarketsCache | null = null;
 
 function buildCache(markets: OddsPapiMarket[]): MarketsCache {
@@ -221,16 +189,9 @@ function buildCache(markets: OddsPapiMarket[]): MarketsCache {
     map: resolveOutcomeMap(markets),
     names: new Map(football.map((m) => [String(m.marketId), `${m.marketName} [${m.marketType}, ${m.period}, ${m.handicap}]`])),
     outcomeNames: new Map(football.flatMap((m) => m.outcomes.map((o) => [`${m.marketId}/${o.outcomeId}`, o.outcomeName] as [string, string]))),
-    combos: football
-      .filter((m) => !m.playerProp && (COMBO.test(`${m.marketName} ${m.marketType}`) || m.outcomes.some((o) => /(1|2|home|away).*(&|and|\+).*(over|under)/i.test(o.outcomeName))))
-      .filter((m) => !/(half|corner|booking|card|team 1|team 2)/i.test(m.marketName))
-      .slice(0, 40)
-      .map((m) => ({ id: m.marketId, name: `${m.marketName} [${m.marketType}, ${m.period}, ${m.handicap}]`, outcomes: m.outcomes.map((o) => o.outcomeName).slice(0, 8) })),
   };
 }
 
-const GOAL_MARKET = /(totals|goal|over|under|range|ukupno)/i;
-const NOT_GOAL = /(half|p1|p2|team|corner|card|first goal|firstgoal|scorer|toscore|exact|correct|both|btts|winning|margin|wintonil|highest)/i;
 
 /** Sažet prikaz tržišta: ishodi sa imenom, kvotom i aktivnošću. */
 function describeMarket(mid: string, m: NonNullable<OddsPapiBookmakerOdds["markets"]>[string] & { bookmakerMarketId?: string }) {
@@ -273,14 +234,13 @@ export function createOddsPapiProvider(
       }
       const { map, names } = marketsCache;
       const seenMarkets = new Map<string, number>();
-      // Uzorak za mapirana tržišta i SVA tržišta golova (prva utakmica gde ih kladionica ima)
+      // Uzorak mapiranih tržišta (1 i 2) – prva utakmica gde ih kladionica ima
       const mappedIds = new Set(Object.values(map).flat().map((r) => r!.marketId));
       const samples: Record<string, ReturnType<typeof describeMarket>> = {};
       const sample = (fx: OddsPapiFixture) => {
         const markets = fx.bookmakerOdds?.[slug]?.markets ?? {};
         for (const id of Object.keys(markets)) {
-          const name = names.get(id) ?? "";
-          const relevant = mappedIds.has(id) || (GOAL_MARKET.test(name) && !NOT_GOAL.test(name));
+          const relevant = mappedIds.has(id);
           if (relevant && !(id in samples)) samples[id] = describeMarket(id, markets[id]);
         }
       };
@@ -288,7 +248,7 @@ export function createOddsPapiProvider(
         for (const id of f.rawMarketIds ?? []) seenMarkets.set(id, (seenMarkets.get(id) ?? 0) + 1);
         return f;
       };
-      const missing = (["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).filter((t) => !map[t]);
+      const missing = (["HOME", "AWAY"] as const).filter((t) => !map[t]);
       if (missing.length) await ctx.warn(`OddsPapi nema prepoznato tržište za: ${missing.join(", ")}. Ti tipovi se preskaču.`);
       await ctx.diagnostic?.({ marketMap: Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v!.map((r) => `${r.marketId}/${r.outcomeId}`)])) });
 
@@ -328,11 +288,8 @@ export function createOddsPapiProvider(
       // Dijagnostika: koja tržišta Soccerbet stvarno ima (najčešćih 40)
       const top = [...seenMarkets.entries()].sort((a, b) => b[1] - a[1])
         .map(([id, count]) => ({ id, count, name: names.get(id) ?? "?" }));
-      const comboIds = new Set(marketsCache.combos.map((c) => String(c.id)));
       await ctx.diagnostic?.({
         bookmakerMarkets: top, rawSamples: samples,
-        comboCatalog: marketsCache.combos.map((c) => ({ ...c, offeredByBookmaker: seenMarkets.get(String(c.id)) ?? 0 })),
-        comboOffered: [...seenMarkets.keys()].filter((id) => comboIds.has(id)).length,
       });
     },
   };
@@ -354,14 +311,9 @@ export async function compareBookmakers(apiKey: string, fixtureId: string, fetch
     startTime: fx.startTime,
     bookmakers: ODDSPAPI_BOOKMAKERS.map((b) => {
       const odds = extractOdds(fx, marketsCache!.map, b.slug);
-      // Sva tržišta za golove (pun meč) sa svim ishodima – da se vidi gde je npr. "2+"
-      const goals = Object.entries(fx.bookmakerOdds?.[b.slug]?.markets ?? {})
-        .filter(([mid]) => { const n = marketsCache!.names.get(mid) ?? "?"; return GOAL_MARKET.test(n) && !NOT_GOAL.test(n); })
-        .map(([mid, m]) => describeMarket(mid, m));
       return {
         slug: b.slug,
         name: b.name,
-        goals,
         present: !!fx.bookmakerOdds?.[b.slug],
         odds: Object.fromEntries(Object.entries(odds).map(([k, v]) => [k, v!.price])) as Record<string, number>,
       };

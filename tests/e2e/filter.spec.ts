@@ -53,7 +53,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await expect(count(page)).toHaveText("2");
 
   // kvote u filteru poštuju pravilo
-  const odds = await page.locator("[data-testid=filter-list] [data-odds]:not([data-combo])").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-odds"))));
+  const odds = await page.locator("[data-testid=filter-list] [data-odds]").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-odds"))));
   expect(odds.every((o) => o > 1 && o <= 1.3)).toBe(true);
 
   // 3) duplikat preko API-ja se odbija
@@ -86,7 +86,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await page.getByRole("button", { name: /^Ukloni / }).count();
   await page.getByRole("button", { name: /^Dodaj (?!sve|spojeni)/ }).first().click();
   await expect(count(page)).toHaveText("1");
-  await page.getByRole("button", { name: "2+", exact: true }).click();
+  await page.getByRole("button", { name: "1", exact: true }).click();
   const bulk = page.getByRole("button", { name: /Dodaj sve u filter/ });
   const n = Number((await bulk.textContent())!.match(/\((\d+)\)/)![1]);
   expect(n).toBeGreaterThan(0);
@@ -94,7 +94,7 @@ test("desktop: prevlačenje, +, bez duplikata, trajno čuvanje, uklanjanje i či
   await bulk.click();
   await expect(page.getByRole("status").filter({ hasText: "Dodato" })).toContainText(`Dodato ${n} tipova`);
   await expect(bulk).toHaveText("Dodaj sve u filter (0)");
-  await page.getByRole("button", { name: "2+", exact: true }).click();
+  await page.getByRole("button", { name: "1", exact: true }).click();
 
   // 8) preimenovanje i brisanje filtera uz potvrdu
   await page.getByRole("button", { name: "Preimenuj" }).click();

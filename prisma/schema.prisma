@@ -51,12 +51,6 @@ model Settings {
   apiFootballDailyCap        Int      @default(200)
   /// Result Tracker: koliko OddsPapi provera rezultata dnevno (rezervni izvor)
   oddsPapiResultChecksPerDay Int      @default(10)
-  /// Pravilo: ako su za istu utakmicu i 2+ i 0–3 do maks. kvote, izbacuju se oba tipa
-  excludeGoalsPair           Boolean  @default(true)
-  /// Pravilo: 1/2 + jedan tip golova se igra kao spojeni tip (npr. „1&2+“) – ako kvota ne postoji, utakmica se preskače
-  combineResultGoals         Boolean  @default(true)
-  /// Šta kad izvor nema kvotu spojenog tipa: SKIP = preskoči utakmicu, WINNER_ONLY = igraj samo 1/2, BOTH_SINGLE = igraj oba tipa odvojeno
-  comboFallback              String   @default("WINNER_ONLY")
   updatedAt                  DateTime @updatedAt
 }
 
@@ -81,9 +75,9 @@ enum MarketType {
   HOME
   DRAW
   AWAY
+  /// Ispod: stari tipovi (golovi, spojeni) – više se ne traže, ostaju zbog istorije
   OVER_1_5
   UNDER_3_5
-  /// Spojeni tipovi (jedno tržište kladionice „ishod + golovi“)
   HOME_OVER_1_5
   HOME_UNDER_3_5
   AWAY_OVER_1_5
@@ -116,7 +110,6 @@ model Match {
   finalHomeScore        Int?
   finalAwayScore        Int?
   resultUpdates         ResultUpdate[]
-  comboCandidates       ComboCandidate[]
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   selections            MarketSelection[]
@@ -167,12 +160,6 @@ model RobotScan {
   fixturesTotal    Int?
   fixturesScanned  Int               @default(0)
   fixturesExcluded Int               @default(0)
-  /// Utakmice izbačene jer su imale i 2+ i 0–3 do maks. kvote
-  pairsExcluded    Int               @default(0)
-  /// Utakmice preskočene jer izvor nema kvotu za spojeni tip
-  comboSkipped     Int               @default(0)
-  /// Napravljeni spojeni tipovi
-  combosCreated    Int               @default(0)
   selectionsFound  Int               @default(0)
   requestsUsed     Int               @default(0)
   errors           Json              @default("[]")
@@ -180,7 +167,6 @@ model RobotScan {
   diagnostics      Json              @default("{}")
   updatedAt        DateTime          @updatedAt
   selections       MarketSelection[]
-  comboCandidates  ComboCandidate[]
 
   @@index([startedAt])
   @@index([status])
@@ -283,21 +269,4 @@ model JobState {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
-}
-
-/// Utakmica kojoj treba spojeni tip („1&2+“…), a izvor nema njegovu kvotu – korisnik je unosi ručno.
-model ComboCandidate {
-  id         String     @id @default(cuid())
-  scanId     String
-  scan       RobotScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
-  matchId    String
-  match      Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  comboType  MarketType
-  winnerOdds Decimal    @db.Decimal(8, 4)
-  goalsOdds  Decimal    @db.Decimal(8, 4)
-  source     String
-  createdAt  DateTime   @default(now())
-
-  @@unique([scanId, matchId])
-  @@index([matchId])
 }

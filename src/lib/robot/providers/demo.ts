@@ -36,13 +36,8 @@ export function demoFixtures(from: Date, to: Date): ProviderFixture[] {
       const virtual = i % 9 === 0;
       const pick = () => PRICES[Math.floor(r() * PRICES.length)];
       const odds: Partial<Record<MarketTypeCode, { price: number; changedAt: Date }>> = {};
-      (["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"] as const).forEach((m) => {
+      (["HOME", "AWAY"] as const).forEach((m) => {
         if (r() < 0.85) odds[m] = { price: pick(), changedAt: new Date() };
-      });
-      // DEMO spojene kvote („1&2+“ …) – ponekad ih nema, da se vidi i preskakanje utakmice
-      (["HOME_OVER_1_5", "HOME_UNDER_3_5", "AWAY_OVER_1_5", "AWAY_UNDER_3_5"] as const).forEach((m) => {
-        const p = Math.round((1.3 + r() * 1.2) * 100) / 100;
-        if (i % 2 === 0) odds[m] = { price: p, changedAt: new Date() }; // svaka druga utakmica nema spojene kvote → kandidat za ručni unos
       });
       out.push({
         externalId: `demo-${t}-${k}`,

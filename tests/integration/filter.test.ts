@@ -8,7 +8,7 @@ const HOUR = 3600_000;
 async function wipe() {
   await db.$transaction([
     db.filterSetSelection.deleteMany(), db.filterSet.deleteMany(), db.trackedSelection.deleteMany(), db.resultUpdate.deleteMany(), db.jobState.deleteMany(),
-    db.comboCandidate.deleteMany(), db.marketSelection.deleteMany(), db.robotScan.deleteMany(), db.match.deleteMany(), db.auditLog.deleteMany(),
+    db.marketSelection.deleteMany(), db.robotScan.deleteMany(), db.match.deleteMany(), db.auditLog.deleteMany(),
   ]);
 }
 
@@ -19,24 +19,26 @@ async function seed(kickoffInHours = 5) {
   const match = await db.match.create({
     data: { provider: "test", externalId: `m-${Math.random()}`, homeTeam: "Arsenal", awayTeam: "Chelsea", competition: "PL", kickoffTime: new Date(Date.now() + kickoffInHours * HOUR) },
   });
-  const mk = (marketType: "HOME" | "OVER_1_5" | "UNDER_3_5", odds: number) =>
+  const mk = (marketType: "HOME" | "AWAY" | "OVER_1_5", odds: number) =>
     db.marketSelection.create({ data: { matchId: match.id, scanId: scan.id, marketType, odds, oddsTimestamp: new Date(), source: "Test" } });
-  return { scan, match, home: await mk("HOME", 1.25), over: await mk("OVER_1_5", 1.18), under: await mk("UNDER_3_5", 1.3) };
+  // over = stari tip (2+) koji se više ne igra
+  return { scan, match, home: await mk("HOME", 1.25), away: await mk("AWAY", 1.3), over: await mk("OVER_1_5", 1.18) };
 }
 
 beforeEach(wipe);
 afterAll(async () => { await wipe(); await db.$disconnect(); });
 
 describe("filter – trajno čuvanje i pravila", () => {
-  it("dodaje pojedinačne tipove, isti tip ne može dvaput, različiti tipovi iste utakmice mogu", async () => {
-    const { home, over } = await seed();
+  it("dodaje tipove 1 i 2, isti tip ne može dvaput, 2+ i ostali stari tipovi se odbijaju", async () => {
+    const { home, away, over } = await seed();
     const setId = await createFilterSet(db, { name: "  Vikend   – 50 tipova ", userId: null, stake: 1000 });
     await addEntry(db, { filterSetId: setId, marketSelectionId: home.id, maxOdds: 1.3 });
-    await addEntry(db, { filterSetId: setId, marketSelectionId: over.id, maxOdds: 1.3 });
+    await addEntry(db, { filterSetId: setId, marketSelectionId: away.id, maxOdds: 1.3 });
+    await expect(addEntry(db, { filterSetId: setId, marketSelectionId: over.id, maxOdds: 1.3 })).rejects.toThrow(/samo tipovi 1 i 2/);
     await expect(addEntry(db, { filterSetId: setId, marketSelectionId: home.id, maxOdds: 1.3 })).rejects.toThrow(/već u filteru/);
 
     const entries = await listEntries(db, setId);
-    expect(entries.map((e) => `${e.label}@${e.odds}`).sort()).toEqual(["1@1.25", "2+@1.18"]);
+    expect(entries.map((e) => `${e.label}@${e.odds}`).sort()).toEqual(["1@1.25", "2@1.3"]);
     expect(entries.every((e) => e.stake === 1000 && e.status === "PENDING")).toBe(true);
     const [set] = await listFilterSets(db);
     expect(set.name).toBe("Vikend – 50 tipova");
@@ -44,11 +46,11 @@ describe("filter – trajno čuvanje i pravila", () => {
   });
 
   it("kvota i ulog su snimak: promena uloga u podešavanjima ne menja postojeći filter", async () => {
-    const { home, under } = await seed();
+    const { home, away } = await seed();
     const a = await createFilterSet(db, { name: "A", userId: null, stake: 1000 });
     await addEntry(db, { filterSetId: a, marketSelectionId: home.id, maxOdds: 1.3 });
     const b = await createFilterSet(db, { name: "B", userId: null, stake: 500 });
-    await addEntry(db, { filterSetId: b, marketSelectionId: under.id, maxOdds: 1.3 });
+    await addEntry(db, { filterSetId: b, marketSelectionId: away.id, maxOdds: 1.3 });
     expect((await listEntries(db, a))[0].stake).toBe(1000);
     expect((await listEntries(db, b))[0].stake).toBe(500);
   });
@@ -71,11 +73,12 @@ describe("filter – trajno čuvanje i pravila", () => {
   });
 
   it("uklanjanje i čišćenje ne brišu istoriju; ponovno dodavanje vraća tip", async () => {
-    const { home, over, under } = await seed();
+    const { home, away } = await seed();
+    const other = await seed();
     const setId = await createFilterSet(db, { name: "X", userId: null, stake: 1000 });
     const e1 = await addEntry(db, { filterSetId: setId, marketSelectionId: home.id, maxOdds: 1.3 });
-    await addEntry(db, { filterSetId: setId, marketSelectionId: over.id, maxOdds: 1.3, excludeGoalsPair: false });
-    await addEntry(db, { filterSetId: setId, marketSelectionId: under.id, maxOdds: 1.3, excludeGoalsPair: false });
+    await addEntry(db, { filterSetId: setId, marketSelectionId: away.id, maxOdds: 1.3 });
+    await addEntry(db, { filterSetId: setId, marketSelectionId: other.home.id, maxOdds: 1.3 });
 
     await removeEntry(db, setId, e1);
     expect(await listEntries(db, setId)).toHaveLength(2);
@@ -107,12 +110,13 @@ describe("filter – trajno čuvanje i pravila", () => {
 
   it("dodaj sve: dodaje nove, preskače duplikate, počele i neispravne", async () => {
     const a = await seed();
+    const b = await seed();
     const old = await seed(-1);
     const setId = await createFilterSet(db, { name: "Sve", userId: null, stake: 1000 });
     await addEntry(db, { filterSetId: setId, marketSelectionId: a.home.id, maxOdds: 1.3 });
-    const r = await addEntries(db, { filterSetId: setId, marketSelectionIds: [a.home.id, a.over.id, a.under.id, old.home.id, a.over.id], maxOdds: 1.25, excludeGoalsPair: false });
-    // a.under ima kvotu 1.30 > 1.25
-    expect(r).toEqual({ added: 1, duplicate: 1, started: 1, invalid: 1 });
+    const r = await addEntries(db, { filterSetId: setId, marketSelectionIds: [a.home.id, b.home.id, a.over.id, a.away.id, old.home.id, b.home.id], maxOdds: 1.25 });
+    // a.over je 2+ (više se ne igra), a.away ima kvotu 1.30 > 1.25
+    expect(r).toEqual({ added: 1, duplicate: 1, started: 1, invalid: 2 });
     expect(await listEntries(db, setId)).toHaveLength(2);
   });
 

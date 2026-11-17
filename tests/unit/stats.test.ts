@@ -65,19 +65,20 @@ describe("periodi (Beograd)", () => {
 describe("computeStats", () => {
   const rows = [
     row("WON", "HOME", 1.2, { kickoff: "2026-11-10T10:00:00Z" }),
-    row("LOST", "OVER_1_5", 1.08, { kickoff: "2026-11-10T12:00:00Z", competition: "Kup" }),
-    row("WON", "OVER_1_5", 1.07, { kickoff: "2026-11-11T12:00:00Z" }),
-    row("WON", "UNDER_3_5", 1.27, { kickoff: "2026-11-11T12:00:00Z", filterSetId: "f2", filterSetName: "Drugi" }),
+    row("LOST", "AWAY", 1.08, { kickoff: "2026-11-10T12:00:00Z", competition: "Kup" }),
+    row("WON", "HOME", 1.07, { kickoff: "2026-11-11T12:00:00Z" }),
+    row("WON", "AWAY", 1.27, { kickoff: "2026-11-11T12:00:00Z", filterSetId: "f2", filterSetName: "Drugi" }),
     row("PENDING", "AWAY", 1.15, { kickoff: "2026-11-12T12:00:00Z" }),
   ];
   const s = computeStats(rows, "day");
-  it("po tipu i grupi (ishod vs golovi)", () => {
-    expect(s.byType.map((t) => [t.label, t.won, t.lost])).toEqual([["1", 1, 0], ["2", 0, 0], ["2+", 1, 1], ["0–3", 1, 0]]);
-    expect(s.byGroup.map((g) => [g.key, g.won, g.lost])).toEqual([["result", 1, 0], ["goals", 2, 1]]);
+  it("po tipu (samo 1 i 2) i grupi", () => {
+    expect(s.byType.map((t) => [t.label, t.won, t.lost])).toEqual([["1", 2, 0], ["2", 1, 1]]);
+    expect(s.byGroup.map((g) => [g.key, g.won, g.lost])).toEqual([["result", 3, 1]]);
   });
   it("po kvoti i matrica tip × kvota", () => {
     expect(s.byOdds.find((b) => b.key === "1.06-1.10")).toMatchObject({ won: 1, lost: 1 });
-    expect(s.matrix.find((m) => m.key === "OVER_1_5")!.cells.find((c) => c.bucket === "1.06-1.10")).toMatchObject({ won: 1, lost: 1, passRate: 50 });
+    expect(s.matrix.find((m) => m.key === "AWAY")!.cells.find((c) => c.bucket === "1.06-1.10")).toMatchObject({ won: 0, lost: 1, passRate: 0 });
+    expect(s.matrix.map((m) => m.key)).toEqual(["HOME", "AWAY"]);
   });
   it("vremenska linija sa kumulativnim profitom (bez neobračunatih)", () => {
     expect(s.timeline.map((t) => [t.key, t.won, t.lost, t.net, t.cumulative])).toEqual([
@@ -92,45 +93,14 @@ describe("computeStats", () => {
   });
 });
 
-import { computeCandidateStats, computeStrategies } from "@/lib/stats/compute";
-import { parseManualOdds } from "@/lib/combos/service";
+import { computeStrategies } from "@/lib/stats/compute";
 
 describe("strategije", () => {
-  it("pojedinačni, spojeni, ishod, golovi", () => {
-    const rows = [row("WON", "HOME", 1.2), row("LOST", "OVER_1_5", 1.1), row("WON", "HOME_OVER_1_5", 1.5), row("WON", "UNDER_3_5", 1.25)];
+  it("sve, samo 1, samo 2, po kvoti", () => {
+    const rows = [row("WON", "HOME", 1.2), row("LOST", "AWAY", 1.1), row("WON", "HOME", 1.25)];
     const s = Object.fromEntries(computeStrategies(rows).map((x) => [x.key, x]));
-    expect([s.all.won, s.all.lost]).toEqual([3, 1]);
-    expect([s.singles.won, s.singles.lost]).toEqual([2, 1]);
-    expect([s.combos.won, s.combos.net]).toEqual([1, 500]);
-    expect([s.result.won, s.goals.won, s.goals.lost]).toEqual([1, 1, 1]);
-    expect(s.low.total + s.high.total).toBe(3);
-  });
-});
-
-describe("kandidati za spojeni tip (virtuelno)", () => {
-  it("prolaznost oba dela, potrebna kvota, alternative", () => {
-    const c = (comboType: string, home: number | null, away: number | null) => ({ matchId: `${comboType}${home}${away}${Math.random()}`, comboType, winnerOdds: 1.2, goalsOdds: 1.25, home, away });
-    const s = computeCandidateStats([
-      c("HOME_OVER_1_5", 2, 0), // oba prošla
-      c("HOME_OVER_1_5", 1, 0), // 1 prošao, 2+ pao
-      c("HOME_OVER_1_5", 1, 1), // 1 pao, 2+ prošao
-      c("HOME_OVER_1_5", 3, 1), // oba prošla
-      c("AWAY_UNDER_3_5", null, null), // bez rezultata
-    ]);
-    expect([s.total, s.withResult]).toEqual([5, 4]);
-    expect(s.overall.comboPassRate).toBe(50);
-    expect(s.overall.neededOdds).toBe(2);
-    expect(s.overall.winnerPassRate).toBe(75);
-    expect(s.overall.winnerNet).toBe(3 * 200 - 1000);
-    expect(s.overall.goalsPassRate).toBe(75);
-    expect(s.overall.goalsNet).toBe(3 * 250 - 1000);
-  });
-});
-
-describe("ručno uneta kvota", () => {
-  it("prihvata zarez i tačku, odbija loše", () => {
-    expect(parseManualOdds("1,48")).toBe(1.48);
-    expect(parseManualOdds(" 2.5 ")).toBe(2.5);
-    for (const bad of ["", "abc", "1", "0.9", "1.234", "150"]) expect(() => parseManualOdds(bad)).toThrow();
+    expect([s.all.won, s.all.lost]).toEqual([2, 1]);
+    expect([s.home.won, s.home.lost, s.away.lost]).toEqual([2, 0, 1]);
+    expect([s.low.total, s.high.total]).toEqual([1, 2]);
   });
 });

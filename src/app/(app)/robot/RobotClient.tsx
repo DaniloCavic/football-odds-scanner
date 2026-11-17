@@ -17,7 +17,7 @@ const PERIODS = [
 ] as const;
 type PeriodKey = (typeof PERIODS)[number][0];
 
-const TYPES = ["1", "2", "2+", "0–3", "1&2+", "1&0–3", "2&2+", "2&0–3"] as const;
+const TYPES = ["1", "2"] as const;
 const STATUS_LABEL: Record<ScanStatusDto["status"], [string, string]> = {
   RUNNING: ["Radi", "bg-live/15 text-live"],
   COMPLETED: ["Završeno", "bg-won/15 text-won"],
@@ -231,14 +231,11 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
           <div className="h-2 overflow-hidden rounded-full bg-panel-2">
             <div className={`h-full rounded-full bg-accent transition-all ${running ? "animate-pulse" : ""}`} style={{ width: `${pct}%` }} />
           </div>
-          <dl className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-5">
+          <dl className="mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
             <Stat label="Početak" value={fmtTime.format(new Date(current.startedAt))} />
             <Stat label="Kraj" value={current.finishedAt ? fmtTime.format(new Date(current.finishedAt)) : "—"} />
             <Stat label="Pregledano utakmica" value={`${current.fixturesScanned}${current.fixturesTotal != null ? ` / ${current.fixturesTotal}` : ""}`} testId="scanned" />
             <Stat label="Izbačeno (virtuelno i sl.)" value={String(current.fixturesExcluded)} />
-            <Stat label="Izbačeno (2+ i 0–3)" value={String(current.pairsExcluded ?? 0)} testId="pairs" />
-            <Stat label="Spojeni tipovi" value={String(current.combosCreated ?? 0)} testId="combos" />
-            <Stat label="Bez spojene kvote" value={String(current.comboSkipped ?? 0)} testId="combo-skipped" />
             <Stat label="Pronađeno selekcija" value={String(current.selectionsFound)} testId="found" />
             <Stat label="API zahteva" value={current.isDemo ? "0 (DEMO)" : String(current.requestsUsed)} />
           </dl>
@@ -287,7 +284,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
                     <p className="mt-1.5 font-medium">{s.homeTeam} – {s.awayTeam}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {rows.map((r) => (
-                        <span key={r.id} data-odds={r.odds} data-combo={r.label.includes("&") ? "1" : undefined} title={`Izvor: ${r.source}, kvota od ${fmt.format(new Date(r.oddsTimestamp))}`}
+                        <span key={r.id} data-odds={r.odds} title={`Izvor: ${r.source}, kvota od ${fmt.format(new Date(r.oddsTimestamp))}`}
                           className="inline-flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1 text-sm">
                           <span className="font-semibold">{r.label}</span>
                           <span className="tabular-nums text-accent">{r.odds.toFixed(2)}</span>
@@ -310,7 +307,7 @@ export function RobotClient({ providers: serverProviders, initialScans, today, m
                       <td className="px-3 py-2">{r.competition}</td>
                       <td className="px-3 py-2">{r.homeTeam} – {r.awayTeam}</td>
                       <td className="px-3 py-2 font-semibold">{r.label}</td>
-                      <td className="px-3 py-2 tabular-nums text-accent" data-odds={r.odds} data-combo={r.label.includes("&") ? "1" : undefined}>{r.odds.toFixed(2)}</td>
+                      <td className="px-3 py-2 tabular-nums text-accent" data-odds={r.odds}>{r.odds.toFixed(2)}</td>
                       <td className="px-3 py-2 text-xs text-muted"><span className="flex items-center gap-1.5">{r.source} {r.isDemo && <DemoBadge />}</span></td>
                     </tr>
                   ))}
@@ -379,7 +376,7 @@ function SourceBox({ source, maxRequests }: { source: SourceStatus | null; maxRe
   );
 }
 
-const TYPE_LABEL: Record<string, string> = { HOME: "1", DRAW: "X", AWAY: "2", OVER_1_5: "2+", UNDER_3_5: "0–3" };
+const TYPE_LABEL: Record<string, string> = { HOME: "1", AWAY: "2" };
 
 function Diagnostics({ scan }: { scan: ScanStatusDto }) {
   const d = scan.diagnostics;
@@ -399,34 +396,10 @@ function Diagnostics({ scan }: { scan: ScanStatusDto }) {
       {d.marketMap && <p className="mt-3 break-all text-xs text-muted">Mapiranje tržišta: {JSON.stringify(d.marketMap)}</p>}
       {d.rawSamples && Object.keys(d.rawSamples).length > 0 && (
         <div className="mt-3 text-xs text-muted">
-          <p className="mb-1">Tržišta golova koja kladionica šalje (uzorak, jedna utakmica):</p>
+          <p className="mb-1">Tržišta 1 i 2 koja kladionica šalje (uzorak, jedna utakmica):</p>
           {Object.values(d.rawSamples).every((x) => x && typeof x === "object" && "outcomes" in (x as object) && Array.isArray((x as MarketDesc).outcomes))
             ? <MarketList markets={Object.values(d.rawSamples) as MarketDesc[]} />
             : <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-2 text-[11px]">{JSON.stringify(d.rawSamples, null, 1)}</pre>}
-        </div>
-      )}
-      {d.ruleLog && (
-        <div className="mt-3 text-xs text-muted" data-testid="rule-log">
-          <p className="mb-1">Primena pravila ({d.ruleLog.length} utakmica):</p>
-          {d.ruleLog.length === 0 ? <p>Nijedna utakmica nije imala kombinaciju tipova na koju se pravilo primenjuje.</p> : (
-            <ul className="space-y-0.5">
-              {d.ruleLog.map((r, i) => (
-                <li key={i}><span className="text-text">{r.match}</span>: našao {r.found.join(", ")} → sačuvano: <b className="text-text">{r.kept.length ? r.kept.join(", ") : "ništa"}</b> <span>({r.note})</span></li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-      {d.comboCatalog && (
-        <div className="mt-3 text-xs text-muted" data-testid="combo-catalog">
-          <p className="mb-1">Spojena tržišta „ishod + golovi“ u OddsPapi katalogu: <b className="text-text">{d.comboCatalog.length}</b></p>
-          {d.comboCatalog.length === 0 ? <p>Nema nijednog – OddsPapi ne prenosi spojene tipove.</p> : (
-            <ul className="space-y-0.5">
-              {d.comboCatalog.map((c) => (
-                <li key={c.id}><span className="text-text">{c.id}</span> {c.name} · ishodi: {c.outcomes.join(", ")} · {scan.providerName}: {c.offeredByBookmaker ? <b className="text-won">nudi ({c.offeredByBookmaker} utakmica)</b> : "ne nudi"}</li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
       {markets && markets.length > 0 && (
@@ -461,7 +434,7 @@ function MarketList({ markets }: { markets: MarketDesc[] }) {
 type CompareResult = {
   fixtureId: string; match: string; competition: string; startTime: string;
   bookmakers: { slug: string; name: string; present: boolean; odds: Record<string, number>;
-    goals?: MarketDesc[] }[];
+ }[];
 };
 
 function CompareBox() {
@@ -495,24 +468,18 @@ function CompareBox() {
                 <p className="text-xs text-muted">{r.competition} · {fmt.format(new Date(r.startTime))}</p>
                 <p className="mb-2 font-medium">{r.match}</p>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[480px] text-left text-sm">
-                    <thead className="text-muted"><tr><th className="py-1 font-medium">Kladionica</th>{["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <th key={t} className="font-medium">{TYPE_LABEL[t]}</th>)}</tr></thead>
+                  <table className="w-full min-w-[320px] text-left text-sm">
+                    <thead className="text-muted"><tr><th className="py-1 font-medium">Kladionica</th>{["HOME", "AWAY"].map((t) => <th key={t} className="font-medium">{TYPE_LABEL[t]}</th>)}</tr></thead>
                     <tbody>
                       {r.bookmakers.map((b) => (
                         <tr key={b.slug} className="border-t border-line/50">
                           <td className="py-1.5">{b.name}{!b.present && <span className="ml-1 text-xs text-muted">(nema utakmicu)</span>}</td>
-                          {["HOME", "AWAY", "OVER_1_5", "UNDER_3_5"].map((t) => <td key={t} className="tabular-nums">{b.odds[t]?.toFixed(2) ?? <span className="text-muted">—</span>}</td>)}
+                          {["HOME", "AWAY"].map((t) => <td key={t} className="tabular-nums">{b.odds[t]?.toFixed(2) ?? <span className="text-muted">—</span>}</td>)}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                {r.bookmakers.filter((b) => b.goals?.length).map((b) => (
-                  <details key={b.slug} className="mt-2 text-xs text-muted">
-                    <summary className="cursor-pointer">{b.name}: sva tržišta golova (pun meč)</summary>
-                    <MarketList markets={b.goals!} />
-                  </details>
-                ))}
               </div>
             ))}
           </div>

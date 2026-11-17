@@ -40,11 +40,10 @@ test("DEMO skeniranje: samo kvote do 1.30, virtuelni fudbal izbačen, DEMO oznak
   expect(found).toBeGreaterThan(0);
   await expect(page.getByText("Izbačeno (virtuelno i sl.)").locator("..").locator("dd")).not.toHaveText("0");
 
-  const all = await page.locator("[data-testid=selections] [data-odds]").evaluateAll((els) => els.map((e) => ({ o: Number(e.getAttribute("data-odds")), combo: e.hasAttribute("data-combo") })));
-  expect(all.length).toBe(found);
-  const odds = all.filter((x) => !x.combo).map((x) => x.o); // pojedinačni tipovi: do 1.30; spojeni: bez ograničenja
-  expect(all.filter((x) => x.combo).every((x) => x.o > 1)).toBe(true);
-  await expect(page.getByTestId("combos")).not.toHaveText("0");
+  const odds = await page.locator("[data-testid=selections] [data-odds]").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-odds"))));
+  expect(odds.length).toBe(found);
+  // samo pobednik meča: tipovi 1 i 2
+  await expect(page.locator("[data-testid=selections]").getByText(/^(2\+|0–3)$/)).toHaveCount(0);
   for (const o of odds) {
     expect(o).toBeGreaterThan(1);
     expect(o).toBeLessThanOrEqual(1.3);
@@ -54,12 +53,12 @@ test("DEMO skeniranje: samo kvote do 1.30, virtuelni fudbal izbačen, DEMO oznak
   await expect(page.locator("[data-testid=selections]").getByText("DEMO", { exact: true }).first()).toBeVisible();
 
   // filter po tipu i sortiranje po kvoti
-  await page.getByRole("button", { name: "2+", exact: true }).click();
+  await page.getByRole("button", { name: "1", exact: true }).click();
   const labels = await page.locator("[data-testid=selections] [data-odds]").count();
   expect(labels).toBeGreaterThan(0);
   expect(labels).toBeLessThan(found);
   await page.getByLabel("Sortiranje").selectOption("odds");
-  const sorted = await page.locator("[data-testid=selections] td[data-odds]:not([data-combo])").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-odds"))));
+  const sorted = await page.locator("[data-testid=selections] td[data-odds]").evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-odds"))));
   expect(sorted).toEqual([...sorted].sort((a, b) => a - b));
 
   // dashboard pokazuje poslednje skeniranje
