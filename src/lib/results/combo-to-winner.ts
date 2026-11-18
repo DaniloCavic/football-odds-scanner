@@ -36,82 +36,94 @@ export async function convertCombosToWinner(db: PrismaClient, now = new Date()):
       trackedSelection: { marketType: { in: [...COMBOS] } },
       OR: [{ removedAt: null }, { removedAt: { gte: removedByMigrationFrom } }],
     },
-    include: { trackedSelection: { include: { match: true } }, marketSelection: true },
+    include: COMBO_ENTRY_INCLUDE,
     orderBy: { addedAt: "asc" },
   });
 
   const report: ComboToWinnerReport = { combos: entries.length, converted: 0, alreadyInFilter: 0, noWinnerOdds: [], settled: 0, pending: 0 };
 
-  for (const e of entries) {
-    const combo = e.trackedSelection;
-    const match = combo.match;
-    const winner = winnerOf(combo.marketType);
-    await db.$transaction(async (tx) => {
-      // kvota pobednika: isto skeniranje → već praćen tip → najnovije drugo skeniranje
-      const sameScan = await tx.marketSelection.findUnique({
-        where: { scanId_matchId_marketType: { scanId: e.marketSelection.scanId, matchId: match.id, marketType: winner } },
-      });
-      let tracked = await tx.trackedSelection.findUnique({ where: { matchId_marketType: { matchId: match.id, marketType: winner } } });
-      const anyScan = sameScan ?? (tracked ? null : await tx.marketSelection.findFirst({
-        where: { matchId: match.id, marketType: winner, manualOdds: false },
-        orderBy: { createdAt: "desc" },
-      }));
-      const ms = sameScan ?? (tracked ? await tx.marketSelection.findUniqueOrThrow({ where: { id: tracked.marketSelectionId } }) : anyScan);
-      const odds = sameScan?.odds ?? tracked?.originalOdds ?? anyScan?.odds ?? null;
-      if (!ms || !odds) {
-        report.noWinnerOdds.push({ match: `${match.homeTeam} – ${match.awayTeam}`, type: MARKET_LABELS[combo.marketType] });
-        return;
-      }
-
-      // ishod pobednika
-      const home = match.finalHomeScore ?? combo.finalHomeScore;
-      const away = match.finalAwayScore ?? combo.finalAwayScore;
-      let status: TrackStatus;
-      if (e.settlementStatus === "VOID") status = "VOID";
-      else if (home != null && away != null) status = outcomeFor(winner, home, away);
-      else status = (tracked?.status as TrackStatus | undefined) ?? "PENDING";
-      const final = status === "WON" || status === "LOST" || status === "VOID";
-
-      if (!tracked) {
-        tracked = await tx.trackedSelection.create({
-          data: { matchId: match.id, marketSelectionId: ms.id, marketType: winner, selection: MARKET_LABELS[winner], originalOdds: odds },
-        });
-      }
-      if (final && tracked.status !== status) {
-        tracked = await tx.trackedSelection.update({
-          where: { id: tracked.id },
-          data: { status, finalHomeScore: home, finalAwayScore: away, resultSource: combo.resultSource ?? "Konverzija spojenog tipa", settledAt: combo.settledAt ?? now },
-        });
-      }
-
-      const amounts = final ? amountsFor(status, e.stake, odds) : { grossReturn: null, netProfit: null };
-      const existing = await tx.filterSetSelection.findUnique({
-        where: { filterSetId_trackedSelectionId: { filterSetId: e.filterSetId, trackedSelectionId: tracked.id } },
-      });
-      if (existing && !existing.removedAt) {
-        report.alreadyInFilter += 1; // pobednik je već u filteru – samo se uklanja spojeni tip
-      } else {
-        const data = {
-          marketSelectionId: ms.id, oddsSnapshot: odds, stake: e.stake, addedAt: e.addedAt, removedAt: null,
-          settlementStatus: status, grossReturn: amounts.grossReturn, netProfit: amounts.netProfit,
-        };
-        if (existing) await tx.filterSetSelection.update({ where: { id: existing.id }, data });
-        else await tx.filterSetSelection.create({ data: { ...data, filterSetId: e.filterSetId, trackedSelectionId: tracked.id } });
-        report.converted += 1;
-        if (final) report.settled += 1; else report.pending += 1;
-      }
-      if (!e.removedAt) await tx.filterSetSelection.update({ where: { id: e.id }, data: { removedAt: now } });
-      await tx.auditLog.create({
-        data: {
-          entityType: "FilterSetSelection", entityId: e.id, action: "COMBO_TO_WINNER",
-          oldValue: { type: MARKET_LABELS[combo.marketType], odds: Number(e.oddsSnapshot), status: e.settlementStatus },
-          newValue: { type: MARKET_LABELS[winner], odds: Number(odds), status },
-          reason: "Spojeni tip vraćen kao samo pobednik meča",
-        },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-  }
+  for (const e of entries) await convertEntry(db, e, now, report);
 
   await setState(db, COMBO_TO_WINNER_KEY, { ...report, at: now.toISOString() });
   return report;
+}
+
+type ComboEntry = Prisma.FilterSetSelectionGetPayload<{ include: { trackedSelection: { include: { match: true } }; marketSelection: true } }>;
+export const COMBO_ENTRY_INCLUDE = { trackedSelection: { include: { match: true } }, marketSelection: true } as const;
+
+/**
+ * Jedan spojeni tip → pobednik (1 ili 2) u istom filteru. Kvota pobednika: isto skeniranje → već praćen tip → drugo skeniranje.
+ * Vraća false ako kvota pobednika ne postoji (tada se ništa ne menja).
+ */
+export async function convertEntry(db: PrismaClient, e: ComboEntry, now: Date, report: ComboToWinnerReport): Promise<boolean> {
+  let ok = true;
+  const combo = e.trackedSelection;
+  const match = combo.match;
+  const winner = winnerOf(combo.marketType);
+  await db.$transaction(async (tx) => {
+    // kvota pobednika: isto skeniranje → već praćen tip → najnovije drugo skeniranje
+    const sameScan = await tx.marketSelection.findUnique({
+      where: { scanId_matchId_marketType: { scanId: e.marketSelection.scanId, matchId: match.id, marketType: winner } },
+    });
+    let tracked = await tx.trackedSelection.findUnique({ where: { matchId_marketType: { matchId: match.id, marketType: winner } } });
+    const anyScan = sameScan ?? (tracked ? null : await tx.marketSelection.findFirst({
+      where: { matchId: match.id, marketType: winner, manualOdds: false },
+      orderBy: { createdAt: "desc" },
+    }));
+    const ms = sameScan ?? (tracked ? await tx.marketSelection.findUniqueOrThrow({ where: { id: tracked.marketSelectionId } }) : anyScan);
+    const odds = sameScan?.odds ?? tracked?.originalOdds ?? anyScan?.odds ?? null;
+    if (!ms || !odds) {
+      ok = false;
+      report.noWinnerOdds.push({ match: `${match.homeTeam} – ${match.awayTeam}`, type: MARKET_LABELS[combo.marketType] });
+      return;
+    }
+
+    // ishod pobednika
+    const home = match.finalHomeScore ?? combo.finalHomeScore;
+    const away = match.finalAwayScore ?? combo.finalAwayScore;
+    let status: TrackStatus;
+    if (e.settlementStatus === "VOID") status = "VOID";
+    else if (home != null && away != null) status = outcomeFor(winner, home, away);
+    else status = (tracked?.status as TrackStatus | undefined) ?? "PENDING";
+    const final = status === "WON" || status === "LOST" || status === "VOID";
+
+    if (!tracked) {
+      tracked = await tx.trackedSelection.create({
+        data: { matchId: match.id, marketSelectionId: ms.id, marketType: winner, selection: MARKET_LABELS[winner], originalOdds: odds },
+      });
+    }
+    if (final && tracked.status !== status) {
+      tracked = await tx.trackedSelection.update({
+        where: { id: tracked.id },
+        data: { status, finalHomeScore: home, finalAwayScore: away, resultSource: combo.resultSource ?? "Konverzija spojenog tipa", settledAt: combo.settledAt ?? now },
+      });
+    }
+
+    const amounts = final ? amountsFor(status, e.stake, odds) : { grossReturn: null, netProfit: null };
+    const existing = await tx.filterSetSelection.findUnique({
+      where: { filterSetId_trackedSelectionId: { filterSetId: e.filterSetId, trackedSelectionId: tracked.id } },
+    });
+    if (existing && !existing.removedAt) {
+      report.alreadyInFilter += 1; // pobednik je već u filteru – samo se uklanja spojeni tip
+    } else {
+      const data = {
+        marketSelectionId: ms.id, oddsSnapshot: odds, stake: e.stake, addedAt: e.addedAt, removedAt: null,
+        settlementStatus: status, grossReturn: amounts.grossReturn, netProfit: amounts.netProfit,
+      };
+      if (existing) await tx.filterSetSelection.update({ where: { id: existing.id }, data });
+      else await tx.filterSetSelection.create({ data: { ...data, filterSetId: e.filterSetId, trackedSelectionId: tracked.id } });
+      report.converted += 1;
+      if (final) report.settled += 1; else report.pending += 1;
+    }
+    if (!e.removedAt) await tx.filterSetSelection.update({ where: { id: e.id }, data: { removedAt: now } });
+    await tx.auditLog.create({
+      data: {
+        entityType: "FilterSetSelection", entityId: e.id, action: "COMBO_TO_WINNER",
+        oldValue: { type: MARKET_LABELS[combo.marketType], odds: Number(e.oddsSnapshot), status: e.settlementStatus },
+        newValue: { type: MARKET_LABELS[winner], odds: Number(odds), status },
+        reason: "Spojeni tip vraćen kao samo pobednik meča",
+      },
+    });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  return ok;
 }
